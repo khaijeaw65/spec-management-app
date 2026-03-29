@@ -1,0 +1,69 @@
+services:
+
+  spec-app-pg:
+    image: postgres:16-alpine
+    container_name: spec-app-pg
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: spec_admin
+      POSTGRES_PASSWORD: spec_secret
+      POSTGRES_DB: spec_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - spec-app-pg-data:/var/lib/postgresql/data
+    networks:
+      - spec-app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U spec_admin -d spec_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  spec-app-redis:
+    image: redis:7-alpine
+    container_name: spec-app-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - spec-app-redis-data:/data
+    networks:
+      - spec-app-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  spec-app-sonarqube:
+    image: sonarqube:community
+    container_name: spec-app-sonarqube
+    restart: unless-stopped
+    depends_on:
+      spec-app-pg:
+        condition: service_healthy
+    environment:
+      SONAR_JDBC_URL: jdbc:postgresql://spec-app-pg:5432/sonar_db
+      SONAR_JDBC_USERNAME: spec_admin
+      SONAR_JDBC_PASSWORD: spec_secret
+    ports:
+      - "9000:9000"
+    volumes:
+      - spec-app-sonarqube-data:/opt/sonarqube/data
+      - spec-app-sonarqube-logs:/opt/sonarqube/logs
+      - spec-app-sonarqube-extensions:/opt/sonarqube/extensions
+    networks:
+      - spec-app-network
+
+volumes:
+  spec-app-pg-data:
+  spec-app-redis-data:
+  spec-app-sonarqube-data:
+  spec-app-sonarqube-logs:
+  spec-app-sonarqube-extensions:
+
+networks:
+  spec-app-network:
+    name: spec-app-network
+    driver: bridge

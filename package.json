@@ -1,0 +1,10 @@
+{
+  "name": "spec-app",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "frontend",
+    "mobile",
+    "packages/*"
+  ]
+}

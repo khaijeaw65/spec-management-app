@@ -1,0 +1,209 @@
+# ============================================================
+# .cursorrules — Spec App Project
+# ============================================================
+# This file is read by Cursor before every prompt.
+# Do not remove or rename this file.
+# ============================================================
+
+## Project Overview
+Specification Clarification Application.
+Workflow-based AI system that converts Minutes of Meeting (MOM)
+into structured specification documents with ambiguity/risk detection.
+Not a chat AI. AI is only called in controlled workflow steps.
+2 developers. Pre-production / university project + talent competition.
+
+## Tech Stack
+- Backend:     NestJS (TypeScript)
+- Database:    PostgreSQL 16, TypeORM
+- Queue:       AWS SQS (async AI generation)
+- AI:          OpenAI API direct (gpt-4o-mini)
+- Storage:     AWS S3 (private bucket)
+- Secrets:     AWS Secrets Manager (injected by ECS at runtime)
+- Frontend:    Vercel (Next.js) — separate repo
+- Mobile:      Review-only app — separate repo
+- CI/CD:       GitHub Actions → ECR → ECS Fargate
+
+## Project Structure
+backend/
+  src/
+    main.ts                          → HTTP API entry point
+    worker.main.ts                   → SQS worker entry point (no HTTP)
+    app.module.ts                    → root module
+    constant/
+      sql-column.constant.ts         → column type constants
+    entities/
+      base.entity.ts                 → base entity (id + audit columns)
+      *.entity.ts                    → one file per entity
+    modules/
+      user/
+      template/
+      spec/
+      lookup/
+      queue/                         → SQS producer (used by API)
+      worker/                        → SQS consumer (used by worker)
+
+## Entities
+All entities extend BaseEntity from backend/src/entities/base.entity.ts
+BaseEntity contains:
+- id: UUID primary key, generated with uuid_generate_v4()
+- createdBy: UUID FK → user.id, nullable
+- createdOn: timestamptz, default NOW()
+- updatedBy: UUID FK → user.id, nullable
+- updatedOn: timestamptz, default NOW()
+- deletedBy: UUID FK → user.id, nullable
+- deletedOn: timestamptz, nullable
+
+Never repeat audit columns on individual entities.
+Never add id column on individual entities.
+Always import column types from backend/src/constant/sql-column.constant.ts.
+No magic strings for column types anywhere.
+
+Entity files: backend/src/entities/
+- base.entity.ts
+- user.entity.ts
+- language.entity.ts
+- spec-status.entity.ts
+- section-type.entity.ts
+- risk-type.entity.ts
+- main-template.entity.ts
+- template.entity.ts
+- template-section.entity.ts
+- main-generated-spec.entity.ts
+- generated-spec.entity.ts
+- generated-spec-section.entity.ts
+- spec-risk.entity.ts
+
+## TypeORM Rules
+- synchronize: false always, no exceptions
+- No eager: true on any relation
+- Always use @JoinColumn({ name: 'snake_case_column' }) on @ManyToOne side
+- camelCase property names, TypeORM maps to snake_case DB columns automatically
+- nullable FK columns use { nullable: true } in both @Column and @ManyToOne
+- Relations loaded explicitly via relations: {} in queries, never auto-loaded
+- All relations define both sides: @ManyToOne on child, @OneToMany on parent
+- No @Exclude() decorators on entities
+
+## NestJS Config Pattern
+- ConfigModule.forRoot() in AppModule only — loads .env locally, no-op on ECS
+- ConfigModule.forFeature(registerAs('domain', () => ({...}))) per domain module
+- Each domain has its own ConfigService wrapper class
+- No USE_AWS_SECRET flag
+- No AWS SDK calls at bootstrap
+- All config reads from process.env — source does not matter to the app
+- ECS injects Secrets Manager values into process.env before container starts
+
+Planned registerAs domains:
+- 'database'  → DB_HOST, DB_PORT, DB_USER, DB_PASS, DB_NAME
+- 'openai'    → OPENAI_API_KEY
+- 's3'        → S3_BUCKET, S3_REGION
+- 'sqs'       → SQS_QUEUE_URL, SQS_REGION
+
+## Service / Controller Pattern
+- Never return raw TypeORM entities from controllers
+- Always map entity to DTO before returning from service
+- Use static DTO.from(entity) factory pattern for mapping
+- TypeORM relations loaded explicitly only when needed
+- No @Exclude() needed — DTO mapping handles response shaping
+
+## Async Generation Flow (SQS)
+API layer responsibilities:
+1. Validate request
+2. Save GeneratedSpec to DB with status PROCESSING
+3. Save MOM content to S3
+4. Push job to SQS queue
+5. Return job accepted response immediately to user
+
+Worker layer responsibilities:
+1. Consume job from SQS
+2. Call OpenAI API (gpt-4o-mini, one call per generation)
+3. Save GeneratedSpecSections to DB
+4. Save SpecRisks to DB
+5. Update GeneratedSpec status → COMPLETED
+6. Update MainGeneratedSpec.currentVersion pointer
+
+On failure:
+- Set GeneratedSpec status → FAILED
+- Do NOT update currentVersion pointer
+- currentVersion keeps pointing to last stable COMPLETED version
+
+## Architecture Rules
+- Never call OpenAI from API layer (HTTP request lifecycle)
+- Never call OpenAI from a controller or service triggered by HTTP
+- OpenAI is only called from the SQS worker process
+- Never update currentVersion before COMPLETED status
+- Never update currentVersion on FAILED status
+- API returns immediately after pushing to SQS — never waits for AI
+
+## Soft Delete Rules
+- Never hard delete any record
+- Soft delete only via deletedOn + deletedBy on all tables
+- When querying active records always filter: WHERE deleted_on IS NULL
+- TypeORM @SoftDelete() or manual deletedOn filter — be consistent
+
+## Database Schema Decisions
+- MainGeneratedSpec.currentVersion is a denormalized pointer to the
+  latest COMPLETED GeneratedSpec version
+  Reason: avoids JOIN + status filter to find latest version on every read
+- Language is locked per GeneratedSpec version (not changeable after generation)
+- Spec content is read-only after generation (no UPDATE on spec content)
+- Regenerate always creates a new GeneratedSpec version, never mutates existing
+- Template change creates a new MainGeneratedSpec root, not a new version
+- MOM stored in S3, store s3Key + s3Bucket (never full URLs)
+- AI metadata stored per GeneratedSpec version:
+  aiModel, promptTokens, completionTokens, totalTokens, generationTimeMs
+
+## Indexes (already in schema.sql, do not re-create)
+- user(email)
+- user(username)
+- main_template(user_id, deleted_on)
+- template(main_template_id, version)
+- template_section(template_id, sort_order)
+- main_generated_spec(user_id, deleted_on)
+- generated_spec(main_spec_id, version)
+- generated_spec(status_id)
+- generated_spec_section(spec_id, sort_order)
+- spec_risk(spec_id)
+- spec_risk(section_id)
+
+## Local Dev Stack
+- spec-app-pg:         PostgreSQL 16 (localhost:5432)
+- spec-app-redis:      Redis 7 (localhost:6379) — reserved, not wired yet
+- spec-app-sonarqube:  SonarQube community (localhost:9000)
+- SQS: real AWS dev queue (no localstack)
+  Queue name: spec-app-dev-generation-queue
+
+## ECS Deployment
+Single Docker image, two ECS task definitions:
+- spec-app-api-task    → CMD: node dist/main.js
+- spec-app-worker-task → CMD: node dist/worker.main.js
+
+GitHub Actions builds once, pushes one image to ECR.
+Both tasks pull same image, different CMD override per task definition.
+
+## AWS Infrastructure
+- VPC: 2 public subnets + 2 private subnets
+- No NAT Gateway (cost saving)
+- No ALB (cost saving, pre-prod)
+- ECS Fargate in public subnet
+- RDS PostgreSQL in private subnet (no public access)
+- S3 private bucket
+- SQS queue for generation jobs
+- Secrets Manager for all secrets
+
+## What NOT To Do
+- Do NOT use synchronize: true
+- Do NOT use eager loading on any relation
+- Do NOT return raw entities from controllers
+- Do NOT call AWS SDK for secrets at bootstrap
+- Do NOT add @Exclude() decorators
+- Do NOT hard delete any record
+- Do NOT update currentVersion on FAILED status
+- Do NOT call OpenAI from HTTP request lifecycle
+- Do NOT use BullMQ (using SQS directly)
+- Do NOT use localstack (use real AWS dev SQS queue)
+- Do NOT add NAT Gateway or ALB to infra
+- Do NOT use Aurora Serverless (not in current scope)
+- Do NOT store full S3 URLs (store key + bucket only)
+- Do NOT add chat AI interface (system is workflow-based only)
+- Do NOT repeat audit columns on individual entities (use BaseEntity)
+- Do NOT add id column on individual entities (use BaseEntity)
