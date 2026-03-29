@@ -1,0 +1,17 @@
+export const LENGTH_1024 = '1024';
+export const LENGTH_500 = '500';
+export const LENGTH_255 = '255';
+export const LENGTH_128 = '128';
+export const LENGTH_100 = '100';
+export const LENGTH_50 = '50';
+export const LENGTH_10 = '10';
+export const LENGTH_1 = '1';
+export const VARCHAR = 'varchar';
+export const TEXT = 'text';
+export const UUID = 'uuid';
+export const NULLABLE = true;
+export const BIGINT = 'bigint';
+export const NUMERIC = 'numeric';
+export const TIMESTAMPTZ = 'timestamptz';
+export const INTEGER = 'integer';
+export const BOOLEAN = 'boolean';
