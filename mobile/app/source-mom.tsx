@@ -46,7 +46,6 @@ export default function SourceMomScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-white">
-      {/* App Bar */}
       <View className="flex-row items-center px-4 py-4 border-b border-gray-100 bg-white">
         <TouchableOpacity onPress={() => router.back()} className="p-2 mr-2">
           <ChevronLeft color="#374151" size={24} />
@@ -59,7 +58,6 @@ export default function SourceMomScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 60 }}
       >
-        {/* Meeting Header */}
         <View className="bg-gray-50 rounded-2xl p-5 border border-gray-200 mb-6">
           <Text className="text-[17px] font-bold text-gray-900 mb-3">{momData.title}</Text>
           <View className="space-y-2">
@@ -74,7 +72,6 @@ export default function SourceMomScreen() {
           </View>
         </View>
 
-        {/* Attendees */}
         <View className="mb-6">
           <View className="flex-row items-center gap-x-2 mb-3">
             <Users color="#374151" size={16} />
@@ -95,7 +92,6 @@ export default function SourceMomScreen() {
           </View>
         </View>
 
-        {/* Agenda / Discussion Items */}
         <View>
           <Text className="text-[15px] font-bold text-gray-900 mb-3">Discussion Notes</Text>
           <View className="space-y-4">

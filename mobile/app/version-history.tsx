@@ -65,7 +65,6 @@ export default function VersionHistoryScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-white">
-      {/* App Bar */}
       <View className="flex-row items-center px-4 py-4 border-b border-gray-100 bg-white">
         <TouchableOpacity onPress={() => router.back()} className="p-2 mr-2">
           <ChevronLeft color="#374151" size={24} />
@@ -84,10 +83,9 @@ export default function VersionHistoryScreen() {
 
         {versions.map((v, index) => (
           <View key={index} className="flex-row mb-0">
-            {/* Timeline Line */}
             <View className="items-center mr-4">
               <View className={`w-8 h-8 rounded-full items-center justify-center ${v.isCurrent ? 'bg-blue-600' : 'bg-gray-100'}`}>
-                {v.isCurrent 
+                {v.isCurrent
                   ? <Clock color="white" size={15} />
                   : <CheckCircle2 color="#9CA3AF" size={15} />
                 }
@@ -97,7 +95,6 @@ export default function VersionHistoryScreen() {
               )}
             </View>
 
-            {/* Card */}
             <View className={`flex-1 mb-5 rounded-2xl border p-4 ${v.isCurrent ? 'border-blue-200 bg-blue-50' : 'border-gray-100 bg-white'} shadow-sm`}>
               <View className="flex-row justify-between items-center mb-2">
                 <Text className={`text-[15px] font-bold ${v.isCurrent ? 'text-blue-700' : 'text-gray-900'}`}>
@@ -129,18 +126,15 @@ export default function VersionHistoryScreen() {
                 ))}
               </View>
 
-              {/* View button only — no Restore per FR-VERS-03 */}
               <TouchableOpacity
-                className={`flex-row items-center justify-center gap-x-2 py-2 rounded-xl border ${
-                  v.isCurrent
+                className={`flex-row items-center justify-center gap-x-2 py-2 rounded-xl border ${v.isCurrent
                     ? 'border-blue-300 bg-blue-100'
                     : 'border-gray-200 bg-gray-50'
-                }`}
+                  }`}
               >
                 <Eye color={v.isCurrent ? '#3B82F6' : '#6B7280'} size={14} />
-                <Text className={`text-[13px] font-semibold ${
-                  v.isCurrent ? 'text-blue-600' : 'text-gray-600'
-                }`}>
+                <Text className={`text-[13px] font-semibold ${v.isCurrent ? 'text-blue-600' : 'text-gray-600'
+                  }`}>
                   {v.isCurrent ? 'Viewing Current' : 'View'}
                 </Text>
               </TouchableOpacity>
