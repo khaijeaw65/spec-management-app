@@ -31,3 +31,24 @@ export const RegisterSchema = z.object({
 });
 
 export type RegisterDto = z.infer<typeof RegisterSchema>;
+
+export const RegisterResponseSchema = z.object({
+  accessToken: z.string(),
+  refreshToken: z.string(),
+  user: AuthUserSchema,
+});
+
+export type RegisterResponseDto = z.infer<typeof RegisterResponseSchema>;
+
+export const RefreshTokenRequestSchema = z.object({
+  refreshToken: z.string().min(1),
+});
+
+export type RefreshTokenDto = z.infer<typeof RefreshTokenRequestSchema>;
+
+/** Same shape as login; clients can reuse the same response handler. */
+export const RefreshTokenResponseSchema = LoginResponseSchema;
+
+export type RefreshTokenResponseDto = z.infer<
+  typeof RefreshTokenResponseSchema
+>;

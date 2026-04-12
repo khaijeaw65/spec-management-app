@@ -8,3 +8,12 @@ export const UserSchema = z.object({
 });
 
 export type User = z.infer<typeof UserSchema>;
+
+export const UpdateUserSchema = z.object({
+  email: z.email(),
+  firstName: z.string(),
+  lastName: z.string(),
+  password: z.string().optional(),
+});
+
+export type UpdateUserDto = z.infer<typeof UpdateUserSchema>;
