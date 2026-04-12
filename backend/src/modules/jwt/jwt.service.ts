@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { IInternalJwtService } from './interface/jwt.interface';
+import { IInternalJwtService } from './interfaces/jwt.interface';
 import {
   JwtSignOptions,
   JwtVerifyOptions,

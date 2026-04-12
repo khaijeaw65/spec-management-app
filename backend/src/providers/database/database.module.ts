@@ -1,19 +1,19 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule as NestTypeOrmModule } from '@nestjs/typeorm';
-import { DatabaseConfigService } from 'src/providers/config/database/config.service';
-import { DatabaseConfigModule } from 'src/providers/config/database/config.module';
-import { UserEntity } from 'src/entities/user.entity';
-import { GeneratedSpecSectionEntity } from 'src/entities/generated-spec-section.entity';
-import { GeneratedSpecEntity } from 'src/entities/generated-spec.entity';
-import { MainGeneratedSpecEntity } from 'src/entities/main-generated-spec.entity';
-import { MainTemplateEntity } from 'src/entities/main-template.entity';
-import { SpecRiskEntity } from 'src/entities/spec-risk.entity';
-import { TemplateSectionEntity } from 'src/entities/template-section.entity';
-import { TemplateEntity } from 'src/entities/template.entity';
-import { RiskTypeEntity } from 'src/entities/risk-type.entity';
-import { SectionTypeEntity } from 'src/entities/section-type.entity';
-import { LanguageEntity } from 'src/entities/language.entity';
-import { SpecStatusEntity } from 'src/entities/spec-status.entity';
+import { DatabaseConfigService } from '../config/database/config.service';
+import { DatabaseConfigModule } from '../config/database/config.module';
+import { UserEntity } from '../../entities/user.entity';
+import { GeneratedSpecSectionEntity } from '../../entities/generated-spec-section.entity';
+import { GeneratedSpecEntity } from '../../entities/generated-spec.entity';
+import { MainGeneratedSpecEntity } from '../../entities/main-generated-spec.entity';
+import { MainTemplateEntity } from '../../entities/main-template.entity';
+import { SpecRiskEntity } from '../../entities/spec-risk.entity';
+import { TemplateSectionEntity } from '../../entities/template-section.entity';
+import { TemplateEntity } from '../../entities/template.entity';
+import { RiskTypeEntity } from '../../entities/risk-type.entity';
+import { SectionTypeEntity } from '../../entities/section-type.entity';
+import { LanguageEntity } from '../../entities/language.entity';
+import { SpecStatusEntity } from '../../entities/spec-status.entity';
 import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
 
 @Module({
@@ -46,6 +46,7 @@ import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
         synchronize: false,
         logging: false,
         namingStrategy: new SnakeNamingStrategy(),
+        subscribers: [],
       }),
     }),
   ],

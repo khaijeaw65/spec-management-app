@@ -11,7 +11,8 @@ declare namespace NodeJS {
     SECRET_PROVIDER?: string;
     STORAGE_PROVIDER?: string;
 
-    JWT_SECRET?: string;
+    JWT_ACCESS_TOKEN_SECRET?: string;
+    JWT_REFRESH_TOKEN_SECRET?: string;
     JWT_ACCESS_TOKEN_EXPIRES_IN?: string;
     JWT_REFRESH_TOKEN_EXPIRES_IN?: string;
 

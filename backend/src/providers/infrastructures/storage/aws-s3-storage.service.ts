@@ -9,8 +9,8 @@ import {
   type ListObjectsV2CommandOutput,
 } from '@aws-sdk/client-s3';
 import { Readable } from 'node:stream';
-import { IStorageService } from 'src/modules/storage/ports/storage-service.interface';
-import { StorageConfigService } from 'src/providers/config/storage/config.service';
+import { IStorageService } from '../../../modules/storage/ports/storage-service.interface';
+import { StorageConfigService } from '../../config/storage/config.service';
 
 @Injectable()
 export class AwsS3StorageService implements IStorageService {

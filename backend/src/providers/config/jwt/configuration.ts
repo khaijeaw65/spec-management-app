@@ -3,14 +3,16 @@ import { registerAs } from '@nestjs/config';
 
 export default registerAs('jwt', () => {
   const config = {
-    secret: process.env.JWT_SECRET,
+    accessTokenSecret: process.env.JWT_ACCESS_TOKEN_SECRET,
+    refreshTokenSecret: process.env.JWT_REFRESH_TOKEN_SECRET,
     accessTokenExpiresIn: process.env.JWT_ACCESS_TOKEN_EXPIRES_IN,
     refreshTokenExpiresIn: process.env.JWT_REFRESH_TOKEN_EXPIRES_IN,
   };
 
   const result = z
     .object({
-      secret: z.string(),
+      accessTokenSecret: z.string(),
+      refreshTokenSecret: z.string(),
       accessTokenExpiresIn: z.string(),
       refreshTokenExpiresIn: z.string(),
     })

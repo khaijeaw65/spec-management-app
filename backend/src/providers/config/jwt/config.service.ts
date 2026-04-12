@@ -7,8 +7,16 @@ export class JwtConfigService {
   private readonly prefix = 'jwt';
   constructor(private readonly configService: ConfigService) {}
 
-  get secret(): string {
-    return this.configService.getOrThrow<string>(`${this.prefix}.secret`);
+  get accessTokenSecret(): string {
+    return this.configService.getOrThrow<string>(
+      `${this.prefix}.accessTokenSecret`,
+    );
+  }
+
+  get refreshTokenSecret(): string {
+    return this.configService.getOrThrow<string>(
+      `${this.prefix}.refreshTokenSecret`,
+    );
   }
 
   get accessTokenExpiresIn(): StringValue {

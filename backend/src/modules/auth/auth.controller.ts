@@ -5,19 +5,28 @@ import {
   LoginResponseSchema,
   LoginSchema,
   type LoginDto,
+  RefreshTokenRequestSchema,
+  RefreshTokenResponseSchema,
+  type RefreshTokenDto,
   type RegisterDto,
   RegisterSchema,
+  RegisterResponseSchema,
+  AuthUserSchema,
 } from '@spec-app/schemas';
-import { Public } from 'src/decorators/public.decorator';
+import { Public } from '../../decorators/public.decorator';
 import {
   ApiBearerAuth,
   ApiBody,
   ApiCreatedResponse,
+  ApiOkResponse,
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
-import { zodToOpenapi, zodToOpenapiResponse } from 'src/swagger/zod-to-openapi';
-import { AuthUser } from 'src/decorators/auth-user.decorator';
+import {
+  zodToOpenapi,
+  zodToOpenapiResponse,
+} from '../../swagger/zod-to-openapi';
+import { AuthUser } from '../../decorators/auth-user.decorator';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -36,13 +45,25 @@ export class AuthController {
   @Get('profile')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Refresh Profile' })
+  @ApiOkResponse({ schema: zodToOpenapiResponse(AuthUserSchema) })
   getProfile(@AuthUser() user: AuthUserDto) {
-    return user;
+    return this.authService.getProfile(user);
+  }
+
+  @Public()
+  @Post('refresh')
+  @ApiOperation({ summary: 'Refresh tokens' })
+  @ApiBody({ schema: zodToOpenapi(RefreshTokenRequestSchema) })
+  @ApiOkResponse({ schema: zodToOpenapiResponse(RefreshTokenResponseSchema) })
+  refresh(@Body() body: RefreshTokenDto) {
+    return this.authService.refresh(body);
   }
 
   @Public()
   @Post('register')
+  @ApiOperation({ summary: 'Register' })
   @ApiBody({ schema: zodToOpenapi(RegisterSchema) })
+  @ApiCreatedResponse({ schema: zodToOpenapiResponse(RegisterResponseSchema) })
   register(@Body() body: RegisterDto) {
     return this.authService.register(body);
   }

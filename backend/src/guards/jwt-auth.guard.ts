@@ -7,7 +7,7 @@ import { Reflector } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
 import { AuthUserDto } from '@spec-app/schemas';
 import { Observable } from 'rxjs';
-import { IS_PUBLIC_KEY } from 'src/decorators/public.decorator';
+import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { Request } from 'express';
 
 function passportInfoMessage(info: unknown): string | undefined {

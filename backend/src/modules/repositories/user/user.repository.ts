@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { UserEntity } from 'src/entities/user.entity';
+import { UserEntity } from '../../../entities/user.entity';
 import { Repository } from 'typeorm';
 import { IUserRepository } from './user.repository.interface';
 
@@ -57,13 +57,13 @@ export class UserRepository implements IUserRepository {
   }
 
   async delete(id: string) {
-    await this.userRepository.delete({
+    return await this.userRepository.delete({
       id,
       isActive: true,
     });
   }
 
   async softDelete(id: string) {
-    await this.userRepository.update(id, { isActive: false });
+    return await this.userRepository.update(id, { isActive: false });
   }
 }

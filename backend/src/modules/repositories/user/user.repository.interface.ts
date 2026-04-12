@@ -1,5 +1,5 @@
-import { UserEntity } from 'src/entities/user.entity';
-import { DeepPartial } from 'typeorm';
+import { UserEntity } from '../../../entities/user.entity';
+import { DeepPartial, DeleteResult, UpdateResult } from 'typeorm';
 
 export abstract class IUserRepository {
   abstract findByEmail(email: string): Promise<UserEntity | null>;
@@ -7,6 +7,6 @@ export abstract class IUserRepository {
   abstract findById(id: string): Promise<UserEntity | null>;
   abstract create(user: DeepPartial<UserEntity>): Promise<UserEntity>;
   abstract update(user: DeepPartial<UserEntity>): Promise<UserEntity>;
-  abstract delete(id: string): Promise<void>;
-  abstract softDelete(id: string): Promise<void>;
+  abstract delete(id: string): Promise<DeleteResult>;
+  abstract softDelete(id: string): Promise<UpdateResult>;
 }
