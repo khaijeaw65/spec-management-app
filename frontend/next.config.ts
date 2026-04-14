@@ -3,12 +3,14 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const _dirname = path.dirname(fileURLToPath(import.meta.url));
+/** Monorepo root so Turbopack can resolve `file:../packages/schemas` from node_modules. */
+const monorepoRoot = path.join(_dirname, "..");
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  transpilePackages: ["@spec-app/schemas"],
   turbopack: {
-    root: _dirname,
-  }
+    root: monorepoRoot,
+  },
 };
 
 export default nextConfig;

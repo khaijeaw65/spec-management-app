@@ -17,8 +17,8 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
-  TemplateFormSchema,
-  type TemplateFormDto,
+  TemplateDetailSchema,
+  type TemplateDetailDto,
 } from "@spec-app/schemas";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -44,7 +44,7 @@ import { cn } from "@/lib/utils";
 
 type TemplateFormProps = {
   mode: "create" | "edit";
-  defaultValues: TemplateFormDto;
+  defaultValues: TemplateDetailDto;
 };
 
 function SortableSectionRow({
@@ -56,7 +56,7 @@ function SortableSectionRow({
 }: Readonly<{
   id: string;
   index: number;
-  control: Control<TemplateFormDto>;
+  control: Control<TemplateDetailDto>;
   canRemove: boolean;
   onRemove: () => void;
 }>) {
@@ -204,8 +204,8 @@ export function TemplateForm({
     control,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm<TemplateFormDto>({
-    resolver: zodResolver(TemplateFormSchema),
+  } = useForm<TemplateDetailDto>({
+    resolver: zodResolver(TemplateDetailSchema),
     defaultValues,
   });
 
@@ -341,6 +341,35 @@ export function TemplateForm({
                   )}
                 </div>
               </div>
+
+              <Controller
+                control={control}
+                name="description"
+                render={({ field, fieldState }) => (
+                  <TextField.Root
+                    fullWidth
+                    isInvalid={!!fieldState.error}
+                    name={field.name}
+                    onBlur={field.onBlur}
+                    onChange={field.onChange}
+                    value={field.value}
+                  >
+                    <Label.Root className="text-sm font-medium text-zinc-900">
+                      Template description
+                    </Label.Root>
+                    <TextArea.Root
+                      className="mt-1.5 min-h-[110px] border-zinc-200"
+                      placeholder="Optional description to help teammates understand the purpose of this template"
+                      rows={4}
+                    />
+                    {fieldState.error ? (
+                      <FieldError className="mt-1">
+                        {fieldState.error.message}
+                      </FieldError>
+                    ) : null}
+                  </TextField.Root>
+                )}
+              />
             </div>
           </div>
 
@@ -380,7 +409,7 @@ export function TemplateForm({
               variant="outline"
               className="border-dashed"
               onPress={() =>
-                append({ title: "", description: "" })
+                append({ title: "", description: "", order: fields.length + 1 })
               }
             >
               <Plus className="size-4" aria-hidden />
