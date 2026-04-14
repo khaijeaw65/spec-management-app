@@ -1,6 +1,6 @@
 import { IRequestContextService } from './interfaces/request.context.interface';
 
-export class RequestContextMock implements IRequestContextService {
+export class MockRequestContextService implements IRequestContextService {
   private _userId = 'mock-user-id';
 
   get userId(): string {

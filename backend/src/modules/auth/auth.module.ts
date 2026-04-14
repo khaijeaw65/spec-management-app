@@ -6,7 +6,6 @@ import { UserModule } from '../user/user.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './jwt.strategy';
-import { RequestContextService } from 'src/contexts/request/request.context';
 
 @Module({
   imports: [
@@ -16,6 +15,6 @@ import { RequestContextService } from 'src/contexts/request/request.context';
     PassportModule.register({ defaultStrategy: 'jwt' }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, RequestContextService, JwtStrategy],
+  providers: [AuthService, JwtStrategy],
 })
 export class AuthModule {}

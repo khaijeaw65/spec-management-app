@@ -1,6 +1,6 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { ClsService } from 'nestjs-cls';
-import { RequestClsStore } from './request.context.type';
+import { RequestClsStore } from './context.type';
 import { IRequestContextService } from './interfaces/request.context.interface';
 
 @Injectable()

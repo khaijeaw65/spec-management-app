@@ -1,6 +1,6 @@
 import { IUserRepository } from './user.repository.interface';
 
-export class UserRepositoryMock implements IUserRepository {
+export class MockUserRepository implements IUserRepository {
   findByEmail = jest
     .fn()
     .mockReturnValue({ id: 'mock-id', email: 'mock-email' });

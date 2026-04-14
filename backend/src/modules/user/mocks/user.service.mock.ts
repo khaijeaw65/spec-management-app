@@ -1,6 +1,6 @@
 import { IUserService } from '../interfaces/user.interface';
 
-export class UserServiceMock implements IUserService {
+export class MockUserService implements IUserService {
   getByEmail = jest
     .fn()
     .mockReturnValue({ id: 'mock-id', email: 'mock-email' });

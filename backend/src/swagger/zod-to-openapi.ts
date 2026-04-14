@@ -13,7 +13,16 @@ export function zodToOpenapiResponse(schema: z.ZodTypeAny): SchemaObject {
     properties: {
       status: { type: 'number' },
       message: { type: 'string', example: 'success' },
-      data: toJSONSchema(schema) as SchemaObject,
+      data: z.toJSONSchema(schema, {
+        unrepresentable: 'any',
+        override: (ctx) => {
+          const def = ctx.zodSchema._zod.def;
+          if (def.type === 'date') {
+            ctx.jsonSchema.type = 'string';
+            ctx.jsonSchema.format = 'date-time';
+          }
+        },
+      }) as SchemaObject,
     },
     required: ['status', 'message', 'data'],
   };

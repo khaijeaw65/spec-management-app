@@ -49,4 +49,10 @@ export class TemplateEntity extends BaseEntity {
     (generatedSpec) => generatedSpec.templateVersion,
   )
   generatedSpecs: GeneratedSpecEntity[];
+
+  @OneToMany(
+    () => MainTemplateEntity,
+    (mainTemplate) => mainTemplate.currentVersion,
+  )
+  mainTemplatesWhereCurrent: MainTemplateEntity[];
 }

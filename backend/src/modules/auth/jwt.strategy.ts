@@ -4,7 +4,7 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import type { AuthUserDto } from '@spec-app/schemas';
 import { JwtConfigService } from '../../providers/config/jwt/config.service';
 import { UserService } from '../user/user.service';
-import { RequestContextService } from '../../contexts/request/request.context';
+import { IRequestContextService } from '../../contexts/request/interfaces/request.context.interface';
 
 type AccessTokenPayload = {
   sub: string;
@@ -17,7 +17,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   constructor(
     private readonly jwtConfigService: JwtConfigService,
     private readonly userService: UserService,
-    private readonly requestContextService: RequestContextService,
+    private readonly requestContextService: IRequestContextService,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),

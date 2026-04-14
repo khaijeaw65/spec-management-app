@@ -11,6 +11,7 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { TemplateModule } from './modules/template/template.module';
 import { SpecModule } from './modules/spec/spec.module';
 import { ClsModule } from 'nestjs-cls';
+import { RequestContextModule } from './contexts/request/context.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { ClsModule } from 'nestjs-cls';
         mount: true,
       },
     }),
+    RequestContextModule,
     DatabaseModule,
     StorageModule,
     UserModule,

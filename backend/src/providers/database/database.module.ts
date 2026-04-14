@@ -11,7 +11,6 @@ import { SpecRiskEntity } from '../../entities/spec-risk.entity';
 import { TemplateSectionEntity } from '../../entities/template-section.entity';
 import { TemplateEntity } from '../../entities/template.entity';
 import { RiskTypeEntity } from '../../entities/risk-type.entity';
-import { SectionTypeEntity } from '../../entities/section-type.entity';
 import { LanguageEntity } from '../../entities/language.entity';
 import { SpecStatusEntity } from '../../entities/spec-status.entity';
 import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
@@ -38,7 +37,6 @@ import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
           GeneratedSpecSectionEntity,
           SpecRiskEntity,
           RiskTypeEntity,
-          SectionTypeEntity,
           LanguageEntity,
           SpecStatusEntity,
         ],
