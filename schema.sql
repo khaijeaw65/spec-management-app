@@ -6,10 +6,13 @@
 --   [1] sort_order added to template_section
 --   [2] sort_order added to generated_spec_section
 --   [3] section_id FK added to spec_risk
---   [4] email added to user
+--   [4] email added to user, username dropped
 --   [5] name moved to main_generated_spec
 --   [6] template_version_id added to generated_spec
 --   [7] main_template -> template version chain kept
+--   [8] section_type table dropped — name + description sufficient for AI
+--   [9] current_version pointer added to main_template (future team sharing)
+--  [10] language_id added to main_template (FR-TEMP-05)
 -- ============================================================
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -32,7 +35,8 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 CREATE TABLE language (
   id         UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
-  name       VARCHAR(50) NOT NULL UNIQUE,
+  code       VARCHAR(10) NOT NULL UNIQUE,  -- used by frontend/API (EN, TH)
+  name       VARCHAR(50) NOT NULL UNIQUE,  -- display name (English, Thai)
   created_by UUID,
   created_on TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_by UUID,
@@ -48,18 +52,6 @@ CREATE TABLE spec_status (
   created_on TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_by UUID,
   updated_on TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  deleted_by UUID,
-  deleted_on TIMESTAMPTZ
-);
-
-CREATE TABLE section_type (
-  id         UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
-  name       VARCHAR(100) NOT NULL,
-  purpose    TEXT,
-  created_by UUID,
-  created_on TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-  updated_by UUID,
-  updated_on TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
   deleted_by UUID,
   deleted_on TIMESTAMPTZ
 );
@@ -115,11 +107,6 @@ ALTER TABLE spec_status
   ADD CONSTRAINT fk_spec_status_updated_by FOREIGN KEY (updated_by) REFERENCES "user"(id),
   ADD CONSTRAINT fk_spec_status_deleted_by FOREIGN KEY (deleted_by) REFERENCES "user"(id);
 
-ALTER TABLE section_type
-  ADD CONSTRAINT fk_section_type_created_by FOREIGN KEY (created_by) REFERENCES "user"(id),
-  ADD CONSTRAINT fk_section_type_updated_by FOREIGN KEY (updated_by) REFERENCES "user"(id),
-  ADD CONSTRAINT fk_section_type_deleted_by FOREIGN KEY (deleted_by) REFERENCES "user"(id);
-
 ALTER TABLE risk_type
   ADD CONSTRAINT fk_risk_type_created_by FOREIGN KEY (created_by) REFERENCES "user"(id),
   ADD CONSTRAINT fk_risk_type_updated_by FOREIGN KEY (updated_by) REFERENCES "user"(id),
@@ -131,15 +118,22 @@ ALTER TABLE risk_type
 -- ============================================================
 
 CREATE TABLE main_template (
-  id         UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id    UUID        NOT NULL REFERENCES "user"(id),
-  is_active  BOOLEAN     NOT NULL DEFAULT TRUE,
-  created_by UUID        REFERENCES "user"(id),
-  created_on TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_by UUID        REFERENCES "user"(id),
-  updated_on TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  deleted_by UUID        REFERENCES "user"(id),
-  deleted_on TIMESTAMPTZ
+  id              UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id         UUID        NOT NULL REFERENCES "user"(id),
+  -- FR-TEMP-05: language is fixed at template root level
+  -- language change requires creating a new main_template root
+  language_id     UUID        NOT NULL REFERENCES language(id),
+  -- Denormalized pointer to current active template version.
+  -- Future-proofed for team sharing — avoids ORDER BY version DESC on shared queries.
+  -- Only updated when a template version is finalized.
+  current_version UUID,
+  is_active       BOOLEAN     NOT NULL DEFAULT TRUE,
+  created_by      UUID        REFERENCES "user"(id),
+  created_on      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_by      UUID        REFERENCES "user"(id),
+  updated_on      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  deleted_by      UUID        REFERENCES "user"(id),
+  deleted_on      TIMESTAMPTZ
 );
 
 CREATE TABLE template (
@@ -158,19 +152,25 @@ CREATE TABLE template (
   UNIQUE (main_template_id, version)
 );
 
+-- Wire current_version pointer on main_template now that template exists
+ALTER TABLE main_template
+  ADD CONSTRAINT fk_main_template_current_version
+  FOREIGN KEY (current_version) REFERENCES template(id);
+
 -- [1] sort_order added — required by FR-TEMP-04
+-- [8] section_type_id removed — name + description sufficient for AI guidance
 CREATE TABLE template_section (
-  id              UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
-  template_id     UUID         NOT NULL REFERENCES template(id),
-  section_type_id UUID         NOT NULL REFERENCES section_type(id),
-  name            VARCHAR(255) NOT NULL,
-  sort_order      INT          NOT NULL DEFAULT 0,  -- user-defined section ordering
-  created_by      UUID         REFERENCES "user"(id),
-  created_on      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-  updated_by      UUID         REFERENCES "user"(id),
-  updated_on      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-  deleted_by      UUID         REFERENCES "user"(id),
-  deleted_on      TIMESTAMPTZ,
+  id          UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+  template_id UUID         NOT NULL REFERENCES template(id),
+  name        VARCHAR(255) NOT NULL,
+  description TEXT,                     -- AI guidance: tells AI what to generate for this section
+  sort_order  INT          NOT NULL DEFAULT 0,
+  created_by  UUID         REFERENCES "user"(id),
+  created_on  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  updated_by  UUID         REFERENCES "user"(id),
+  updated_on  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  deleted_by  UUID         REFERENCES "user"(id),
+  deleted_on  TIMESTAMPTZ,
   UNIQUE (template_id, sort_order),
   UNIQUE (template_id, name)
 );
@@ -275,6 +275,7 @@ CREATE INDEX idx_user_email ON "user"(email);
 
 -- Template chain
 CREATE INDEX idx_main_template_user        ON main_template(user_id, deleted_on);
+CREATE INDEX idx_main_template_language    ON main_template(language_id);
 CREATE INDEX idx_template_main             ON template(main_template_id, version);
 CREATE INDEX idx_template_section_template ON template_section(template_id, sort_order);
 
@@ -292,21 +293,15 @@ CREATE INDEX idx_spec_risk_section         ON spec_risk(section_id);
 -- created_by / updated_by left NULL for system seed rows
 -- ============================================================
 
-INSERT INTO language (name) VALUES
-  ('Thai'),
-  ('English');
+INSERT INTO language (code, name) VALUES
+  ('TH', 'Thai'),
+  ('EN', 'English');
 
 INSERT INTO spec_status (name) VALUES
   ('PROCESSING'),
   ('COMPLETED'),
   ('FAILED'),
   ('REVIEWED');
-
-INSERT INTO section_type (name, purpose) VALUES
-  ('General',      'General purpose section'),
-  ('Requirements', 'Functional requirements'),
-  ('Risks',        'Risk and ambiguity section'),
-  ('Scope',        'Project scope definition');
 
 INSERT INTO risk_type (name) VALUES
   ('AMBIGUOUS_LANGUAGE'),
