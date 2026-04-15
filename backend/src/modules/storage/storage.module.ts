@@ -11,9 +11,9 @@ export type StorageProvider = 's3' | 'azure' | 'gcp';
     AwsS3StorageService,
     {
       provide: IStorageService,
-      useClass: AwsS3StorageService,
+      useExisting: AwsS3StorageService,
     },
   ],
-  exports: [AwsS3StorageService],
+  exports: [IStorageService],
 })
 export class StorageModule {}
