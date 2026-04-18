@@ -19,14 +19,14 @@ import { TemplateEntity } from './template.entity';
 
 @Entity({ name: 'template_section' })
 @Unique(['template', 'sortOrder'])
-@Unique(['template', 'name'])
+@Unique(['template', 'title'])
 export class TemplateSectionEntity extends BaseEntity {
   @ManyToOne(() => TemplateEntity, (template) => template.templateSections)
   @JoinColumn({ name: 'template_id' })
   template: TemplateEntity;
 
   @Column({ type: VARCHAR, length: LENGTH_255 })
-  name: string;
+  title: string;
 
   @Column({ type: TEXT, nullable: NULLABLE })
   description?: string | null;

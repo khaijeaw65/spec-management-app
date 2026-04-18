@@ -1,21 +1,21 @@
+import { Injectable } from '@nestjs/common';
 import OpenAI from 'openai';
 import { ILlmClient } from 'src/modules/gen-ai/ports/llm-client.interface';
 import { GenAiConfigService } from 'src/providers/config/gen-ai/config.service';
 
-// adaptor
+@Injectable()
 export class OpenaiLlmClientService implements ILlmClient {
   private readonly client: OpenAI;
 
   constructor(private readonly configService: GenAiConfigService) {
     this.client = new OpenAI({
-      apiKey: this.configService.apiKey,
+      apiKey: configService.apiKey,
     });
   }
 
   async generateText(input: {
     system?: string;
     prompt: string;
-    model?: string;
     temperature?: number;
     json?: boolean;
   }) {
@@ -28,7 +28,7 @@ export class OpenaiLlmClientService implements ILlmClient {
     messages.push({ role: 'user', content: input.prompt });
 
     const completion = await this.client.chat.completions.create({
-      model: input.model ?? this.configService.model,
+      model: this.configService.model,
       messages,
       temperature: input.temperature,
       ...(input.json && {
@@ -38,6 +38,7 @@ export class OpenaiLlmClientService implements ILlmClient {
 
     return {
       text: completion.choices[0].message.content ?? '',
+      model: completion.model,
       usage: completion.usage
         ? {
             promptTokens: completion.usage.prompt_tokens ?? 0,

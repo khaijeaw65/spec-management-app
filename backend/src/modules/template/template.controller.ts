@@ -10,6 +10,7 @@ import {
 import { TemplateService } from './template.service';
 import {
   ApiBearerAuth,
+  ApiBody,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
@@ -22,8 +23,12 @@ import {
   TemplateDetailSchema,
   TemplateListSchema,
   type AuthUserDto,
+  CreateTemplateSchema,
 } from '@spec-app/schemas';
-import { zodToOpenapiResponse } from '../../swagger/zod-to-openapi';
+import {
+  zodToOpenapi,
+  zodToOpenapiResponse,
+} from '../../swagger/zod-to-openapi';
 
 @ApiTags('Template')
 @Controller('template')
@@ -50,6 +55,7 @@ export class TemplateController {
   @Post()
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create template' })
+  @ApiBody({ schema: zodToOpenapi(CreateTemplateSchema) })
   @ApiOkResponse({ schema: zodToOpenapiResponse(TemplateDetailSchema) })
   create(@Body() template: CreateTemplateDto) {
     return this.templateService.create(template);

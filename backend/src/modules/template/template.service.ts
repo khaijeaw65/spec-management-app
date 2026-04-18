@@ -67,7 +67,7 @@ export class TemplateService implements ITemplateService {
       language: languageResult.data,
       sections:
         template.currentVersion?.templateSections.map((section) => ({
-          title: section.name,
+          title: section.title,
           description: section.description ?? '',
           order: section.sortOrder,
         })) ?? [],
@@ -118,7 +118,7 @@ export class TemplateService implements ITemplateService {
       description: createdTemplate.description ?? '',
       language: template.language,
       sections: createdTemplate.templateSections.map((section) => ({
-        title: section.name,
+        title: section.title,
         description: section.description ?? '',
         order: section.sortOrder,
       })),
@@ -179,7 +179,7 @@ export class TemplateService implements ITemplateService {
       description: existingTemplate.currentVersion?.description ?? '',
       templateSections: existingTemplate.currentVersion?.templateSections.map(
         (section) => ({
-          name: section.name,
+          name: section.title,
           description: section.description ?? '',
           sortOrder: section.sortOrder,
         }),
@@ -211,7 +211,7 @@ export class TemplateService implements ITemplateService {
       description: newVersion.description ?? '',
       language: languageResult.data,
       sections: newVersion.templateSections.map((section) => ({
-        title: section.name,
+        title: section.title,
         description: section.description ?? '',
         order: section.sortOrder,
       })),

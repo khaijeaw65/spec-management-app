@@ -5,15 +5,17 @@ export interface LlmUsage {
   totalTokens: number;
 }
 
+export interface LlmResponse {
+  text: string;
+  model: string;
+  usage: LlmUsage | null;
+}
+
 export abstract class ILlmClient {
   abstract generateText(input: {
     system?: string;
     prompt: string;
-    model?: string;
     temperature?: number;
     json?: boolean;
-  }): Promise<{
-    text: string;
-    usage: LlmUsage | null;
-  }>;
+  }): Promise<LlmResponse>;
 }

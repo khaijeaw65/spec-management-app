@@ -14,6 +14,8 @@ import { RiskTypeEntity } from '../../entities/risk-type.entity';
 import { LanguageEntity } from '../../entities/language.entity';
 import { SpecStatusEntity } from '../../entities/spec-status.entity';
 import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
+import { AuditLogEntity } from 'src/entities/audit-log.entity';
+import { AuditSubscriber } from './subscribers/audit.subscriber';
 
 @Module({
   imports: [
@@ -39,6 +41,7 @@ import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
           RiskTypeEntity,
           LanguageEntity,
           SpecStatusEntity,
+          AuditLogEntity,
         ],
         autoLoadEntities: true,
         synchronize: false,
@@ -48,6 +51,7 @@ import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
       }),
     }),
   ],
+  providers: [AuditSubscriber],
   exports: [],
 })
 export class DatabaseModule {}

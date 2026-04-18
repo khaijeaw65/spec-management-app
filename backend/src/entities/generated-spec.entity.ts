@@ -8,6 +8,7 @@ import {
 } from 'typeorm';
 import {
   INTEGER,
+  LENGTH_10,
   LENGTH_100,
   LENGTH_255,
   LENGTH_500,
@@ -47,6 +48,9 @@ export class GeneratedSpecEntity extends BaseEntity {
 
   @Column({ type: INTEGER, default: 1 })
   version: number;
+
+  @Column({ type: VARCHAR, length: LENGTH_10, default: 'TEXT' })
+  momInputType: string;
 
   @Column({ type: VARCHAR, length: LENGTH_500, nullable: NULLABLE })
   momS3Key?: string | null;

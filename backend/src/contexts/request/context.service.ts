@@ -22,4 +22,12 @@ export class RequestContextService implements IRequestContextService {
   set userId(userId: string) {
     this.clsService.set<string>('userId', userId);
   }
+
+  get requestId(): string {
+    return this.clsService.get<string>('requestId');
+  }
+
+  set requestId(requestId: string) {
+    this.clsService.set<string>('requestId', requestId);
+  }
 }

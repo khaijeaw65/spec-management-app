@@ -12,6 +12,7 @@ import { TemplateModule } from './modules/template/template.module';
 import { SpecModule } from './modules/spec/spec.module';
 import { ClsModule } from 'nestjs-cls';
 import { RequestContextModule } from './contexts/request/context.module';
+import { v4 as uuidv4 } from 'uuid';
 
 @Module({
   imports: [
@@ -20,6 +21,9 @@ import { RequestContextModule } from './contexts/request/context.module';
       global: true,
       middleware: {
         mount: true,
+        setup(cls, req: Request) {
+          cls.set('requestId', req.headers['x-request-id'] ?? uuidv4());
+        },
       },
     }),
     RequestContextModule,

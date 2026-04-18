@@ -9,7 +9,10 @@ import {
   type ListObjectsV2CommandOutput,
 } from '@aws-sdk/client-s3';
 import { Readable } from 'node:stream';
-import { IStorageService } from '../../../modules/storage/ports/storage-service.interface';
+import {
+  IStorageFile,
+  IStorageService,
+} from '../../../modules/storage/ports/storage-service.interface';
 import { StorageConfigService } from '../../config/storage/config.service';
 
 @Injectable()
@@ -64,7 +67,7 @@ export class AwsS3StorageService implements IStorageService {
     );
   }
 
-  async getFile(key: string): Promise<Buffer> {
+  async getFile(key: string): Promise<IStorageFile> {
     if (!this.bucket) {
       throw new Error('AWS_S3_BUCKET is not set');
     }
@@ -82,7 +85,12 @@ export class AwsS3StorageService implements IStorageService {
       stream.on('data', (chunk: string | Buffer) => {
         chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
       });
-      stream.on('end', () => resolve(Buffer.concat(chunks)));
+      stream.on('end', () =>
+        resolve({
+          buffer: Buffer.concat(chunks),
+          contentType: result.ContentType as IStorageFile['contentType'],
+        }),
+      );
       stream.on('error', reject);
     });
   }

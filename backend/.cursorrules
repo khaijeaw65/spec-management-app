@@ -89,7 +89,7 @@ Zod validation: z.enum(['EN', 'TH']) for language input.
 - Never updated on draft/failed template versions
 
 ## Entity: TemplateSection
-- name: varchar(255), not null
+- title: varchar(255), not null
 - description: TEXT, nullable — used as AI guidance (tells AI what to generate)
 - sortOrder: int, not null, default 0
 - NO sectionTypeId — section_type table was dropped entirely
