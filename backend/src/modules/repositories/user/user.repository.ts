@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { UserEntity } from '../../../entities/user.entity';
-import { Repository } from 'typeorm';
+import { DeepPartial, Repository } from 'typeorm';
 import { IUserRepository } from './user.repository.interface';
 
 @Injectable()
@@ -48,11 +48,11 @@ export class UserRepository implements IUserRepository {
     });
   }
 
-  async create(user: UserEntity) {
+  async create(user: DeepPartial<UserEntity>) {
     return this.userRepository.save(user);
   }
 
-  async update(user: UserEntity) {
+  async update(user: DeepPartial<UserEntity>) {
     return this.userRepository.save(user);
   }
 

@@ -4,7 +4,8 @@ import {
   Injectable,
   NestInterceptor,
 } from '@nestjs/common';
-import { Observable, map } from 'rxjs';
+import { Observable, EMPTY, mergeMap, of } from 'rxjs';
+import type { Response } from 'express';
 
 @Injectable()
 export class TransformResponseInterceptor implements NestInterceptor {
@@ -13,11 +14,16 @@ export class TransformResponseInterceptor implements NestInterceptor {
     const response = ctx.getResponse<Response>();
 
     return next.handle().pipe(
-      map((data: unknown) => ({
-        status: response.status,
-        message: 'success',
-        data,
-      })),
+      mergeMap((data: unknown) => {
+        if (response.headersSent) {
+          return EMPTY;
+        }
+        return of({
+          status: response.statusCode,
+          message: 'success',
+          data,
+        });
+      }),
     );
   }
 }

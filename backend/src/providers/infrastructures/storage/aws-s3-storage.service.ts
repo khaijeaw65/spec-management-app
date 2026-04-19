@@ -12,7 +12,7 @@ import { Readable } from 'node:stream';
 import {
   IStorageFile,
   IStorageService,
-} from '../../../modules/storage/ports/storage-service.interface';
+} from '../../../modules/storage/ports/storage.service.interface';
 import { StorageConfigService } from '../../config/storage/config.service';
 
 @Injectable()

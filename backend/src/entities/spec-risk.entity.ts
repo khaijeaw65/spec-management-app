@@ -1,5 +1,10 @@
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
-import { NULLABLE, TEXT } from '../constant/sql-column.constant';
+import {
+  LENGTH_10,
+  NULLABLE,
+  TEXT,
+  VARCHAR,
+} from '../constant/sql-column.constant';
 import { BaseEntity } from './base.entity';
 import { GeneratedSpecEntity } from './generated-spec.entity';
 import { GeneratedSpecSectionEntity } from './generated-spec-section.entity';
@@ -20,6 +25,9 @@ export class SpecRiskEntity extends BaseEntity {
   @ManyToOne(() => RiskTypeEntity, (riskType) => riskType.specRisks)
   @JoinColumn({ name: 'risk_type_id' })
   riskType: RiskTypeEntity;
+
+  @Column({ type: VARCHAR, length: LENGTH_10, default: 'MEDIUM' })
+  priority: string;
 
   @Column({ type: TEXT, nullable: NULLABLE })
   detail?: string | null;

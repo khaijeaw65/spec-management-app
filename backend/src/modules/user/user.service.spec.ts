@@ -1,24 +1,24 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { UserService } from './user.service';
 import { IUserRepository } from '../repositories/user/user.repository.interface';
-import { UserRepositoryMock } from '../repositories/user/user.repository.mock';
+import { MockUserRepository } from '../repositories/user/user.repository.mock';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 
 describe('UserService', () => {
   let service: UserService;
-  let userRepository: UserRepositoryMock;
+  let userRepository: MockUserRepository;
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UserService,
-        { provide: IUserRepository, useClass: UserRepositoryMock },
+        { provide: IUserRepository, useClass: MockUserRepository },
       ],
     }).compile();
 
     service = module.get<UserService>(UserService);
     userRepository = module.get<IUserRepository>(
       IUserRepository,
-    ) as UserRepositoryMock;
+    ) as MockUserRepository;
   });
 
   beforeEach(() => {

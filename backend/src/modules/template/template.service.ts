@@ -7,7 +7,7 @@ import {
 import { IMainTemplateRepository } from '../repositories/main-template/main-template.repository.interface';
 import { ITemplateRepository } from '../repositories/template/template.repository.interface';
 import {
-  CreateTemplateDto,
+  type CreateTemplateDto,
   LanguageSchema,
   TemplateDetailDto,
   TemplateDto,
@@ -16,12 +16,15 @@ import {
 import { ITemplateService } from './interfaces/template.service.interface';
 import { IRequestContextService } from '../../contexts/request/interfaces/request.context.interface';
 import { ILanguageRepository } from '../repositories/language/language.repository.interface';
+import { Transactional } from '@nestjs-cls/transactional';
+import { ITemplateSectionRepository } from '../template-section/template-section.repository.interface';
 
 @Injectable()
 export class TemplateService implements ITemplateService {
   constructor(
     private readonly mainTemplateRepository: IMainTemplateRepository,
     private readonly templateRepository: ITemplateRepository,
+    private readonly templateSectionRepository: ITemplateSectionRepository,
     private readonly languageRepository: ILanguageRepository,
     private readonly requestContextService: IRequestContextService,
   ) {}
@@ -38,6 +41,7 @@ export class TemplateService implements ITemplateService {
 
       return {
         id: template.id,
+        versionId: template.currentVersion?.id ?? '',
         name: template.currentVersion?.name ?? '',
         description: template.currentVersion?.description ?? '',
         language: languageResult.data,
@@ -62,6 +66,7 @@ export class TemplateService implements ITemplateService {
 
     return {
       id: template.id,
+      versionId: template.currentVersion?.id ?? '',
       name: template.currentVersion?.name ?? '',
       description: template.currentVersion?.description ?? '',
       language: languageResult.data,
@@ -74,6 +79,7 @@ export class TemplateService implements ITemplateService {
     };
   }
 
+  @Transactional()
   async create(template: CreateTemplateDto): Promise<TemplateDetailDto> {
     const language = await this.languageRepository.findByCode(
       template.language as string,
@@ -105,6 +111,17 @@ export class TemplateService implements ITemplateService {
       })),
     });
 
+    await this.templateSectionRepository.createMany(
+      template.sections.map((section) => ({
+        template: {
+          id: createdTemplate.id,
+        },
+        title: section.title,
+        description: section.description,
+        sortOrder: section.order,
+      })),
+    );
+
     await this.mainTemplateRepository.update({
       id: createdMainTemplate.id,
       currentVersion: {
@@ -113,7 +130,8 @@ export class TemplateService implements ITemplateService {
     });
 
     return {
-      id: createdTemplate.id,
+      id: createdMainTemplate.id,
+      versionId: createdTemplate.id,
       name: createdTemplate.name,
       description: createdTemplate.description ?? '',
       language: template.language,
@@ -146,7 +164,8 @@ export class TemplateService implements ITemplateService {
     await this.templateRepository.update(updatedTemplate);
 
     return {
-      id: updatedTemplate.id,
+      id: existingTemplate.mainTemplate.id,
+      versionId: updatedTemplate.id,
       name: updatedTemplate.name,
       description: updatedTemplate.description ?? '',
       language: template.language,
@@ -206,7 +225,8 @@ export class TemplateService implements ITemplateService {
     }
 
     return {
-      id: newVersion.id,
+      id: existingTemplate.id,
+      versionId: newVersion.id,
       name: newVersion.name,
       description: newVersion.description ?? '',
       language: languageResult.data,

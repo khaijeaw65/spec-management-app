@@ -10,7 +10,10 @@ import { TemplateRepository } from '../repositories/template/template.repository
 import { ITemplateRepository } from '../repositories/template/template.repository.interface';
 import { LanguageRepository } from '../repositories/language/language.repository';
 import { ILanguageRepository } from '../repositories/language/language.repository.interface';
-import { LanguageEntity } from 'src/entities/language.entity';
+import { LanguageEntity } from '../../entities/language.entity';
+import { TemplateSectionEntity } from '../../entities/template-section.entity';
+import { TemplateSectionRepository } from '../template-section/template-section.repository';
+import { ITemplateSectionRepository } from '../template-section/template-section.repository.interface';
 
 @Module({
   imports: [
@@ -18,6 +21,7 @@ import { LanguageEntity } from 'src/entities/language.entity';
       TemplateEntity,
       MainTemplateEntity,
       LanguageEntity,
+      TemplateSectionEntity,
     ]),
   ],
   controllers: [TemplateController],
@@ -34,6 +38,10 @@ import { LanguageEntity } from 'src/entities/language.entity';
     {
       provide: ILanguageRepository,
       useClass: LanguageRepository,
+    },
+    {
+      provide: ITemplateSectionRepository,
+      useClass: TemplateSectionRepository,
     },
   ],
 })

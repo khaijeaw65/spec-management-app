@@ -1,10 +1,38 @@
 import { SchemaObject } from '@nestjs/swagger/dist/interfaces/open-api-spec.interface';
 import { toJSONSchema, z } from 'zod';
 
-export function zodToOpenapi(schema: z.ZodTypeAny) {
-  const jsonSchema = toJSONSchema(schema);
+export function zodToOpenapi(
+  schema: z.ZodTypeAny,
+  example?: unknown,
+): SchemaObject {
+  const jsonSchema = toJSONSchema(schema) as SchemaObject;
+  if (example === undefined) {
+    return jsonSchema;
+  }
+  return { ...jsonSchema, example } as SchemaObject;
+}
 
-  return jsonSchema as SchemaObject;
+/** Multipart body: Zod JSON fields plus optional `file` (binary). */
+export function zodToOpenapiMultipart(
+  schema: z.ZodTypeAny,
+  example: Record<string, unknown>,
+  fileDescription = 'Meeting minutes file. Optional when momContent is provided in the form.',
+): SchemaObject {
+  const base = zodToOpenapi(schema) as SchemaObject & {
+    properties?: Record<string, SchemaObject>;
+  };
+  return {
+    ...base,
+    properties: {
+      ...base.properties,
+      file: {
+        type: 'string',
+        format: 'binary',
+        description: fileDescription,
+      },
+    },
+    example: { ...example },
+  } as SchemaObject;
 }
 
 export function zodToOpenapiResponse(schema: z.ZodTypeAny): SchemaObject {

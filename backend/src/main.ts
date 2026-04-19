@@ -2,8 +2,9 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './exception/http-exception.filter';
 import { TransformResponseInterceptor } from './interceptors/transfrom-response.interceptor';
-import { ConsoleLogger, INestApplication } from '@nestjs/common';
+import { INestApplication } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { LoggerService } from './utils/logger/logger.service';
 
 function setupSwagger(app: INestApplication) {
   const config = new DocumentBuilder()
@@ -21,8 +22,9 @@ function setupSwagger(app: INestApplication) {
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
-    logger: new ConsoleLogger(),
+    bufferLogs: true,
   });
+  app.useLogger(app.get(LoggerService));
   app.useGlobalFilters(new HttpExceptionFilter());
   app.useGlobalInterceptors(new TransformResponseInterceptor());
 
@@ -31,4 +33,4 @@ async function bootstrap() {
   setupSwagger(app);
   await app.listen(process.env.PORT ?? 3000);
 }
-bootstrap();
+void bootstrap();

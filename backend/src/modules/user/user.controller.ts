@@ -36,7 +36,14 @@ export class UserController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update user by id' })
   @ApiParam({ name: 'id', type: String })
-  @ApiBody({ schema: zodToOpenapi(UpdateUserSchema) })
+  @ApiBody({
+    schema: zodToOpenapi(UpdateUserSchema, {
+      email: 'somchai.prasert@company.example',
+      firstName: 'Somchai',
+      lastName: 'Prasert',
+      password: 'NewSecurePass2024!',
+    }),
+  })
   @ApiOkResponse({ schema: zodToOpenapiResponse(UserSchema) })
   updateById(@Param('id') id: string, @Body() body: UpdateUserDto) {
     return this.userService.update(id, body);

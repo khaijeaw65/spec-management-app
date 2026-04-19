@@ -7,7 +7,6 @@ import {
   Unique,
 } from 'typeorm';
 import {
-  BOOLEAN,
   INTEGER,
   LENGTH_255,
   NULLABLE,
@@ -34,9 +33,6 @@ export class TemplateEntity extends BaseEntity {
 
   @Column({ type: TEXT, nullable: NULLABLE })
   description?: string | null;
-
-  @Column({ type: BOOLEAN, default: true })
-  isActive: boolean;
 
   @OneToMany(
     () => TemplateSectionEntity,

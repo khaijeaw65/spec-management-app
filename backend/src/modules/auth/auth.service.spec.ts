@@ -1,16 +1,16 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuthService } from './auth.service';
 import { IInternalJwtService } from '../jwt/interfaces/jwt.interface';
-import { JwtServiceMock } from '../jwt/mocks/jwt.service.mock';
+import { MockJwtService } from '../jwt/mocks/jwt.service.mock';
 import { UserService } from '../user/user.service';
-import { UserServiceMock } from '../user/mocks/user.service.mock';
+import { MockUserService } from '../user/mocks/user.service.mock';
 import { JwtConfigService } from '../../providers/config/jwt/config.service';
 import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import bcrypt from 'bcrypt';
 
 describe('AuthService', () => {
   let service: AuthService;
-  let userService: UserServiceMock;
+  let userService: MockUserService;
 
   beforeEach(async () => {
     jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
@@ -20,11 +20,11 @@ describe('AuthService', () => {
         AuthService,
         {
           provide: UserService,
-          useClass: UserServiceMock,
+          useClass: MockUserService,
         },
         {
           provide: IInternalJwtService,
-          useClass: JwtServiceMock,
+          useClass: MockJwtService,
         },
         {
           provide: JwtConfigService,
@@ -41,7 +41,7 @@ describe('AuthService', () => {
     service = module.get<AuthService>(AuthService);
     userService = module.get<UserService>(
       UserService,
-    ) as unknown as UserServiceMock;
+    ) as unknown as MockUserService;
   });
 
   beforeEach(() => {

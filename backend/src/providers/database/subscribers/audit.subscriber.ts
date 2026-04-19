@@ -37,7 +37,6 @@ export class AuditSubscriber implements EntitySubscriberInterface<BaseEntity> {
   // ─── Audit column hooks ──────────────────────────────────────────
 
   beforeInsert(event: InsertEvent<BaseEntity>) {
-    console.log('before insert', event.entity);
     const userId = this.safeGetUserId();
     event.entity.createdBy = { id: userId };
     event.entity.updatedBy = { id: userId };
@@ -58,8 +57,6 @@ export class AuditSubscriber implements EntitySubscriberInterface<BaseEntity> {
     // skip AuditLogEntity itself — prevent infinite loop
     if (event.entity instanceof AuditLogEntity) return;
 
-    console.log(event.entity);
-
     await event.manager.getRepository(AuditLogEntity).insert({
       entity: event.metadata.targetName,
       entityId: event.entity.id,
@@ -71,7 +68,6 @@ export class AuditSubscriber implements EntitySubscriberInterface<BaseEntity> {
   }
 
   async afterUpdate(event: UpdateEvent<BaseEntity>) {
-    console.log(event.entity);
     if (!event.entity) return;
     if (event.entity instanceof AuditLogEntity) return;
 

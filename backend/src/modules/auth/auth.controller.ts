@@ -35,7 +35,12 @@ export class AuthController {
 
   @Public()
   @ApiOperation({ summary: 'Login' })
-  @ApiBody({ schema: zodToOpenapi(LoginSchema) })
+  @ApiBody({
+    schema: zodToOpenapi(LoginSchema, {
+      email: 'analyst@example.com',
+      password: 'SecurePass2024!',
+    }),
+  })
   @ApiCreatedResponse({ schema: zodToOpenapiResponse(LoginResponseSchema) })
   @Post('login')
   login(@Body() body: LoginDto) {
@@ -53,7 +58,12 @@ export class AuthController {
   @Public()
   @Post('refresh')
   @ApiOperation({ summary: 'Refresh tokens' })
-  @ApiBody({ schema: zodToOpenapi(RefreshTokenRequestSchema) })
+  @ApiBody({
+    schema: zodToOpenapi(RefreshTokenRequestSchema, {
+      refreshToken:
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI1NTBlODQwMC1lMjliLTQxZDQtYTcxNi00NDY2NTU0NDAwMDAiLCJ0eXBlIjoicmVmcmVzaCIsImlhdCI6MTcxMzAwMDgwMH0.signature-placeholder',
+    }),
+  })
   @ApiOkResponse({ schema: zodToOpenapiResponse(RefreshTokenResponseSchema) })
   refresh(@Body() body: RefreshTokenDto) {
     return this.authService.refresh(body);
@@ -62,7 +72,14 @@ export class AuthController {
   @Public()
   @Post('register')
   @ApiOperation({ summary: 'Register' })
-  @ApiBody({ schema: zodToOpenapi(RegisterSchema) })
+  @ApiBody({
+    schema: zodToOpenapi(RegisterSchema, {
+      email: 'new.user@example.com',
+      password: 'SecurePass2024!',
+      firstName: 'Somchai',
+      lastName: 'Prasert',
+    }),
+  })
   @ApiCreatedResponse({ schema: zodToOpenapiResponse(RegisterResponseSchema) })
   register(@Body() body: RegisterDto) {
     return this.authService.register(body);

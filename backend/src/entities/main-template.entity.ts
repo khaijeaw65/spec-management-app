@@ -1,5 +1,4 @@
-import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
-import { BOOLEAN } from '../constant/sql-column.constant';
+import { Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 import { BaseEntity } from './base.entity';
 import { MainGeneratedSpecEntity } from './main-generated-spec.entity';
 import { TemplateEntity } from './template.entity';
@@ -25,9 +24,6 @@ export class MainTemplateEntity extends BaseEntity {
   @ManyToOne(() => LanguageEntity, (language) => language.mainTemplates)
   @JoinColumn({ name: 'language_id' })
   language: LanguageEntity;
-
-  @Column({ type: BOOLEAN, default: true })
-  isActive: boolean;
 
   @OneToMany(() => TemplateEntity, (template) => template.mainTemplate)
   templates: TemplateEntity[];

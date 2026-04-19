@@ -4,16 +4,20 @@ import { OpenaiLlmClientService } from 'src/providers/infrastructures/gen-ai/ope
 import { GenAiConfigModule } from 'src/providers/config/gen-ai/config.module';
 import { ILlmClient } from './ports/llm-client.interface';
 import { StorageModule } from '../storage/storage.module';
+import { IGenAiService } from './ports/gen-ai.interface';
 
 @Module({
   imports: [GenAiConfigModule, StorageModule],
   providers: [
-    GenAiService,
+    {
+      provide: IGenAiService,
+      useClass: GenAiService,
+    },
     {
       provide: ILlmClient,
       useClass: OpenaiLlmClientService,
     },
   ],
-  exports: [GenAiService],
+  exports: [IGenAiService],
 })
 export class GenAiModule {}

@@ -7,12 +7,19 @@ import {
   UpdateDateColumn,
   DeepPartial,
 } from 'typeorm';
-import { NULLABLE, TIMESTAMPTZ } from '../constant/sql-column.constant';
+import {
+  BOOLEAN,
+  NULLABLE,
+  TIMESTAMPTZ,
+} from '../constant/sql-column.constant';
 import type { UserEntity } from './user.entity';
 
 export abstract class BaseEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  @Column({ type: BOOLEAN, default: true })
+  isActive: boolean;
 
   @ManyToOne('UserEntity', { nullable: true })
   @JoinColumn({ name: 'created_by' })

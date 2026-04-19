@@ -1,5 +1,10 @@
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
-import { BOOLEAN, LENGTH_255, VARCHAR } from '../constant/sql-column.constant';
+import {
+  LENGTH_255,
+  NULLABLE,
+  TEXT,
+  VARCHAR,
+} from '../constant/sql-column.constant';
 import { BaseEntity } from './base.entity';
 import { GeneratedSpecEntity } from './generated-spec.entity';
 import { MainTemplateEntity } from './main-template.entity';
@@ -21,6 +26,9 @@ export class MainGeneratedSpecEntity extends BaseEntity {
   @Column({ type: VARCHAR, length: LENGTH_255 })
   name: string;
 
+  @Column({ type: TEXT, nullable: NULLABLE })
+  description?: string | null;
+
   @ManyToOne(
     () => GeneratedSpecEntity,
     (generatedSpec) => generatedSpec.mainGeneratedSpecsWhereCurrent,
@@ -30,9 +38,6 @@ export class MainGeneratedSpecEntity extends BaseEntity {
   )
   @JoinColumn({ name: 'current_version' })
   currentVersion?: GeneratedSpecEntity | null;
-
-  @Column({ type: BOOLEAN, default: true })
-  isActive: boolean;
 
   @OneToMany(
     () => GeneratedSpecEntity,

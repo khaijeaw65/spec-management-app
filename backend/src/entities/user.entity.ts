@@ -1,6 +1,5 @@
 import { Column, Entity, OneToMany } from 'typeorm';
 import {
-  BOOLEAN,
   LENGTH_100,
   LENGTH_255,
   VARCHAR,
@@ -22,9 +21,6 @@ export class UserEntity extends BaseEntity {
 
   @Column({ type: VARCHAR, length: LENGTH_255 })
   password: string;
-
-  @Column({ type: BOOLEAN, default: true })
-  isActive: boolean;
 
   @OneToMany(() => MainTemplateEntity, (mainTemplate) => mainTemplate.user)
   mainTemplates: MainTemplateEntity[];
