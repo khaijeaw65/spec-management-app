@@ -3,6 +3,20 @@ import type { SpecLanguage, SpecStatus } from "@/types/spec.types";
 /** Priority for review UX; maps to risk-type / review workflow, not DB enums. */
 export type SpecRiskPriority = "high" | "medium" | "low";
 
+/** Supported original MOM file types (matches backend upload rules; .doc is not allowed). */
+export type MomFileExtension = "txt" | "pdf" | "docx";
+
+export interface SpecificationMomFile {
+  /** Original or generated file name (e.g. meeting-notes.docx). */
+  fileName: string;
+  extension: MomFileExtension;
+  /**
+   * URL for download and in-app preview. Demo: `/spec-mom-samples/...`;
+   * production: presigned S3 GET URL.
+   */
+  downloadUrl: string;
+}
+
 export interface SpecDetailSection {
   sortOrder: number;
   title: string;
@@ -38,8 +52,11 @@ export interface SpecificationDetail {
   createdByName: string;
   createdAt: string;
   updatedAt: string;
-  /** Raw MOM text for read-only disclosure (S3 in production). */
-  momPlainText: string;
+  /**
+   * Original MOM artifact (S3 in production). Text is not stored in DB — only the file.
+   * UI offers download + preview for .txt, .pdf, .docx.
+   */
+  momFile: SpecificationMomFile | null;
   sections: SpecDetailSection[];
   risks: SpecDetailRisk[];
   versions: SpecDetailVersion[];

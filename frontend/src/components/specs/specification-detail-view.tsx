@@ -26,6 +26,7 @@ import {
 import Link from "next/link";
 import { useCallback, useState } from "react";
 
+import { MomFilePanel } from "@/components/specs/mom-file-panel";
 import { SpecStatusBadge } from "@/components/specs/spec-status-badge";
 import { formatListDate, languageLabel } from "@/lib/spec-list-utils";
 import { cn } from "@/lib/utils";
@@ -153,10 +154,6 @@ export function SpecificationDetailView({
       toast.success("PDF exported successfully");
     }, 1000);
   }, []);
-
-  const momBody =
-    detail.momPlainText.trim() ||
-    "Not available for this specification in the demo.";
 
   return (
     <div className="min-h-screen">
@@ -288,9 +285,14 @@ export function SpecificationDetailView({
           </button>
           {momOpen ? (
             <div className="border-t border-zinc-100 px-4 pb-4 sm:px-5">
-              <pre className="mt-3 max-h-[200px] overflow-auto whitespace-pre-wrap rounded-lg bg-zinc-50 p-3 font-mono text-xs leading-relaxed text-zinc-800">
-                {momBody}
-              </pre>
+              {detail.momFile ? (
+                <MomFilePanel mom={detail.momFile} className="mt-3" />
+              ) : (
+                <p className="mt-3 text-sm text-zinc-600">
+                  No original MOM file is linked for this specification. In production
+                  this would reference the file stored in object storage (e.g. S3).
+                </p>
+              )}
             </div>
           ) : null}
         </div>

@@ -15,16 +15,11 @@ const ECOM_DETAIL: SpecificationDetail = {
   createdByName: "John Doe",
   createdAt: "2024-03-10T10:00:00.000Z",
   updatedAt: "2024-03-15T12:00:00.000Z",
-  momPlainText: `E-Commerce Platform — MOM excerpt (demo)
-
-Attendees: PM, Tech Lead, BA
-Goals: Define MVP storefront scope and non-functional expectations.
-
-Discussion highlights:
-- Users should be able to reset passwords without contacting support.
-- Admin can manage user permissions and approve refunds when needed.
-- Payment gateway will be integrated before the public launch milestone.
-- Performance targets discussed: high concurrency and sub-2s page loads for key paths.`,
+  momFile: {
+    fileName: "ecom-workshop-mom.txt",
+    extension: "txt",
+    downloadUrl: "/spec-mom-samples/ecom-mom.txt",
+  },
   sections: [
     {
       sortOrder: 1,
@@ -116,7 +111,7 @@ function buildPlaceholderDetail(item: SpecificationListItem): SpecificationDetai
     createdByName: "Demo User",
     createdAt: item.updatedAt,
     updatedAt: item.updatedAt,
-    momPlainText: "",
+    momFile: null,
     sections: [
       {
         sortOrder: 1,
@@ -141,5 +136,25 @@ export function getSpecificationDetail(id: string): SpecificationDetail | null {
   const listItem = MOCK_SPECIFICATIONS.find((s) => s.id === id);
   if (!listItem) return null;
   if (id === "spec-ecom-platform") return ECOM_DETAIL;
+  if (id === "spec-api-integration") {
+    return {
+      ...buildPlaceholderDetail(listItem),
+      momFile: {
+        fileName: "integration-requirements.pdf",
+        extension: "pdf",
+        downloadUrl: "/spec-mom-samples/sample.pdf",
+      },
+    };
+  }
+  if (id === "spec-admin-dashboard") {
+    return {
+      ...buildPlaceholderDetail(listItem),
+      momFile: {
+        fileName: "ux-workshop-notes.docx",
+        extension: "docx",
+        downloadUrl: "/spec-mom-samples/sample.docx",
+      },
+    };
+  }
   return buildPlaceholderDetail(listItem);
 }

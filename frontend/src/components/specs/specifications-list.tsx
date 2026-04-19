@@ -8,6 +8,7 @@ import {
   toast,
   useOverlayState,
 } from "@heroui/react";
+import { Pagination } from "@heroui/react/pagination";
 import { FileText, MoreVertical } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -20,9 +21,13 @@ import {
   STATUS_FILTER_OPTIONS,
 } from "@/constants/spec-filters";
 import {
+  clampSpecificationListPage,
   filterAndSortSpecifications,
   formatListDate,
   languageLabel,
+  specificationListPageSlice,
+  specificationListVisibleRange,
+  SPEC_LIST_PAGE_SIZE,
 } from "@/lib/spec-list-utils";
 import { consumePendingSpecification } from "@/lib/spec-session";
 import { MOCK_SPECIFICATIONS } from "@/mocks/spec.mock";
@@ -57,6 +62,7 @@ export function SpecificationsList() {
   const [statusFilter, setStatusFilter] = useState<SpecStatusFilter>("all");
   const [langFilter, setLangFilter] = useState<SpecLangFilter>("all");
   const [sortBy, setSortBy] = useState<SpecSortKey>("newest");
+  const [currentPage, setCurrentPage] = useState(1);
   const [regenerateId, setRegenerateId] = useState<string | null>(null);
   const regenerateModal = useOverlayState({
     isOpen: regenerateId !== null,
@@ -113,6 +119,34 @@ export function SpecificationsList() {
     [specs, search, statusFilter, langFilter, sortBy],
   );
 
+  const totalFiltered = filtered.length;
+  const totalPages =
+    totalFiltered === 0 ? 0 : Math.ceil(totalFiltered / SPEC_LIST_PAGE_SIZE);
+
+  const safePage = useMemo(
+    () => clampSpecificationListPage(currentPage, totalFiltered, SPEC_LIST_PAGE_SIZE),
+    [currentPage, totalFiltered],
+  );
+
+  const pageItems = useMemo(
+    () => specificationListPageSlice(filtered, safePage, SPEC_LIST_PAGE_SIZE),
+    [filtered, safePage],
+  );
+
+  const { start: rangeStart, end: rangeEnd } = useMemo(
+    () => specificationListVisibleRange(safePage, SPEC_LIST_PAGE_SIZE, totalFiltered),
+    [safePage, totalFiltered],
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, statusFilter, langFilter, sortBy]);
+
+  useEffect(() => {
+    if (totalPages === 0) return;
+    setCurrentPage((p) => Math.min(p, totalPages));
+  }, [totalPages]);
+
   const markReviewed = useCallback((id: string) => {
     setSpecs((prev) =>
       prev.map((s) =>
@@ -168,9 +202,11 @@ export function SpecificationsList() {
         </div>
       </div>
 
-      <p className="text-sm text-zinc-500">
-        Showing {filtered.length} of {specs.length} specifications
-      </p>
+      {totalFiltered > 0 ? (
+        <p className="text-sm text-zinc-500">
+          Showing {rangeStart}–{rangeEnd} of {totalFiltered} specifications
+        </p>
+      ) : null}
 
       {filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-zinc-200 bg-white py-16 text-center">
@@ -189,8 +225,9 @@ export function SpecificationsList() {
           </Link>
         </div>
       ) : (
+        <>
         <ul className="space-y-2">
-          {filtered.map((spec) => (
+          {pageItems.map((spec) => (
             <li key={spec.id}>
               <div className="flex flex-wrap items-center gap-3 rounded-lg border border-zinc-200 bg-white px-4 py-3 shadow-sm">
                 <div className="flex min-w-0 flex-1 items-start gap-3">
@@ -202,6 +239,11 @@ export function SpecificationsList() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold text-zinc-950">{spec.title}</p>
+                    {spec.momFileName ? (
+                      <p className="mt-0.5 text-xs text-zinc-500">
+                        MOM file: {spec.momFileName}
+                      </p>
+                    ) : null}
                     <p className="mt-0.5 text-sm text-zinc-500">
                       {spec.templateLabel} • v{spec.version} •{" "}
                       {spec.sectionCount} sections
@@ -261,6 +303,48 @@ export function SpecificationsList() {
             </li>
           ))}
         </ul>
+
+        {totalPages > 1 ? (
+          <Pagination.Root
+            aria-label="Specification list pages"
+            className="mt-4 w-full justify-center gap-1 sm:justify-end"
+            size="sm"
+          >
+            <Pagination.Content className="flex flex-wrap items-center gap-1">
+              <Pagination.Item>
+                <Pagination.Previous
+                  isDisabled={safePage <= 1}
+                  onPress={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                >
+                  <Pagination.PreviousIcon />
+                </Pagination.Previous>
+              </Pagination.Item>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                (pageNum) => (
+                  <Pagination.Item key={pageNum}>
+                    <Pagination.Link
+                      isActive={pageNum === safePage}
+                      onPress={() => setCurrentPage(pageNum)}
+                    >
+                      {pageNum}
+                    </Pagination.Link>
+                  </Pagination.Item>
+                ),
+              )}
+              <Pagination.Item>
+                <Pagination.Next
+                  isDisabled={safePage >= totalPages}
+                  onPress={() =>
+                    setCurrentPage((p) => Math.min(totalPages, p + 1))
+                  }
+                >
+                  <Pagination.NextIcon />
+                </Pagination.Next>
+              </Pagination.Item>
+            </Pagination.Content>
+          </Pagination.Root>
+        ) : null}
+        </>
       )}
 
       <Modal.Root state={regenerateModal}>

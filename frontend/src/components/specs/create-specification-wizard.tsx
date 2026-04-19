@@ -32,8 +32,7 @@ import { useForm } from "react-hook-form";
 
 import { queuePendingSpecification } from "@/lib/spec-session";
 import { TEMPLATE_DETAILS, TEMPLATE_ORDER } from "@/mocks/template.mock";
-import type { SpecLanguage } from "@/types/spec.types";
-import type { SpecificationListItem } from "@/types/spec.types";
+import type { SpecLanguage, SpecificationListItem } from "@/types/spec.types";
 import { cn } from "@/lib/utils";
 
 type WizardFormValues = {
@@ -43,15 +42,13 @@ type WizardFormValues = {
   fileSize: number;
   templateId: string;
   language: SpecLanguage;
+  /** User-provided title; maps to backend `main_generated_spec.name` when wired */
+  name: string;
+  /** Optional; maps to `main_generated_spec.description` */
+  description: string;
 };
 
 const ACCEPT = ".txt,.docx,.application/pdf,.pdf";
-
-function titleFromMom(text: string): string {
-  const line = text.trim().split("\n")[0]?.trim() ?? "";
-  if (!line) return "New specification";
-  return line.length > 80 ? `${line.slice(0, 77)}…` : line;
-}
 
 export function CreateSpecificationWizard() {
   const router = useRouter();
@@ -75,11 +72,14 @@ export function CreateSpecificationWizard() {
       fileSize: 0,
       templateId: "",
       language: "en",
+      name: "",
+      description: "",
     },
   });
 
   const inputMethod = watch("inputMethod");
   const momContent = watch("momContent");
+  const fileName = watch("fileName");
   const templateId = watch("templateId");
   const language = watch("language");
 
@@ -127,6 +127,8 @@ export function CreateSpecificationWizard() {
     const step2Parsed = CreateSpecStep2Schema.safeParse({
       templateId: data.templateId,
       language: data.language,
+      name: data.name,
+      description: data.description?.trim() || undefined,
     });
     if (!step2Parsed.success) {
       setSubmitError(
@@ -159,10 +161,9 @@ export function CreateSpecificationWizard() {
 
     const newItem: SpecificationListItem = {
       id: `spec-${globalThis.crypto.randomUUID()}`,
-      title:
-        data.inputMethod === "paste"
-          ? titleFromMom(data.momContent)
-          : `Specification from ${data.fileName}`,
+      title: data.name.trim(),
+      momFileName:
+        data.inputMethod === "upload" ? data.fileName : undefined,
       templateLabel: tmpl.name,
       version: 1,
       sectionCount: tmpl.sections.length,
@@ -416,6 +417,52 @@ export function CreateSpecificationWizard() {
             </Card.Header>
             <Card.Content className="space-y-6 px-5 py-5">
               <input type="hidden" {...register("templateId")} />
+              <div className="rounded-lg border border-zinc-100 bg-zinc-50/80 px-4 py-3 text-sm text-zinc-700">
+                <p className="font-medium text-zinc-900">Meeting notes source</p>
+                {inputMethod === "upload" ? (
+                  <p className="mt-1 text-zinc-600">
+                    <span className="text-zinc-500">File: </span>
+                    {fileName || "—"}
+                  </p>
+                ) : (
+                  <p className="mt-1 text-zinc-600">
+                    Pasted text ({momContent.trim().length} characters)
+                  </p>
+                )}
+              </div>
+
+              <TextField.Root fullWidth>
+                <Label.Root className="text-sm font-medium text-zinc-900">
+                  Specification name
+                </Label.Root>
+                <p className="mt-1 text-xs text-zinc-500">
+                  Shown in your list and used as the stable spec title when the API
+                  is connected.
+                </p>
+                <input
+                  type="text"
+                  className="mt-2 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none ring-blue-500 focus:ring-2"
+                  placeholder="e.g. Q1 2026 CRM rollout spec"
+                  autoComplete="off"
+                  {...register("name")}
+                />
+              </TextField.Root>
+
+              <TextField.Root fullWidth>
+                <Label.Root className="text-sm font-medium text-zinc-900">
+                  Description
+                </Label.Root>
+                <p className="mt-1 text-xs text-zinc-500">
+                  Optional summary or context for this specification (stored with the
+                  spec record when the API is connected).
+                </p>
+                <TextArea.Root
+                  className="mt-2 min-h-[100px] border-zinc-200 font-sans"
+                  placeholder="e.g. Scope, stakeholders, or goals for this version…"
+                  {...register("description")}
+                />
+              </TextField.Root>
+
               <div>
                 <p className="text-sm font-medium text-zinc-900">Templates</p>
                 <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
