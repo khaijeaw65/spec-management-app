@@ -13,6 +13,14 @@
 --   [8] section_type table dropped — name + description sufficient for AI
 --   [9] current_version pointer added to main_template (future team sharing)
 --  [10] language_id added to main_template (FR-TEMP-05)
+--  [11] mom_input_type added to generated_spec (TEXT | FILE)
+--  [12] template_section.name renamed to title (UI consistency)
+--  [13] audit_log table added
+--  [14] is_active added to all tables except audit_log
+--  [15] code column added to spec_status (same pattern as language)
+--  [16] code column added to risk_type
+--  [17] description added to main_generated_spec (user-provided, optional)
+--  [18] priority added to spec_risk (HIGH | MEDIUM | LOW, AI-determined)
 -- ============================================================
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -37,6 +45,7 @@ CREATE TABLE language (
   id         UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
   code       VARCHAR(10) NOT NULL UNIQUE,  -- used by frontend/API (EN, TH)
   name       VARCHAR(50) NOT NULL UNIQUE,  -- display name (English, Thai)
+  is_active  BOOLEAN     NOT NULL DEFAULT TRUE,
   created_by UUID,
   created_on TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_by UUID,
@@ -47,7 +56,9 @@ CREATE TABLE language (
 
 CREATE TABLE spec_status (
   id         UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
-  name       VARCHAR(50) NOT NULL UNIQUE,
+  code       VARCHAR(20) NOT NULL UNIQUE,  -- used by app code (PROCESSING, COMPLETED, FAILED, REVIEWED)
+  name       VARCHAR(50) NOT NULL UNIQUE,  -- display name (Processing, Completed, Failed, Reviewed)
+  is_active  BOOLEAN     NOT NULL DEFAULT TRUE,
   created_by UUID,
   created_on TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_by UUID,
@@ -58,7 +69,9 @@ CREATE TABLE spec_status (
 
 CREATE TABLE risk_type (
   id         UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
-  name       VARCHAR(100) NOT NULL UNIQUE,
+  code       VARCHAR(50)  NOT NULL UNIQUE,  -- used by app/AI (AMBIGUOUS_LANGUAGE, MISSING_OWNER, etc.)
+  name       VARCHAR(100) NOT NULL UNIQUE,  -- display name (Ambiguous Language, Missing Owner, etc.)
+  is_active  BOOLEAN      NOT NULL DEFAULT TRUE,
   created_by UUID,
   created_on TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
   updated_by UUID,
@@ -162,8 +175,9 @@ ALTER TABLE main_template
 CREATE TABLE template_section (
   id          UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
   template_id UUID         NOT NULL REFERENCES template(id),
-  name        VARCHAR(255) NOT NULL,
+  title       VARCHAR(255) NOT NULL,
   description TEXT,                     -- AI guidance: tells AI what to generate for this section
+  is_active   BOOLEAN      NOT NULL DEFAULT TRUE,
   sort_order  INT          NOT NULL DEFAULT 0,
   created_by  UUID         REFERENCES "user"(id),
   created_on  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
@@ -172,7 +186,7 @@ CREATE TABLE template_section (
   deleted_by  UUID         REFERENCES "user"(id),
   deleted_on  TIMESTAMPTZ,
   UNIQUE (template_id, sort_order),
-  UNIQUE (template_id, name)
+  UNIQUE (template_id, title)
 );
 
 
@@ -186,6 +200,7 @@ CREATE TABLE main_generated_spec (
   template_id     UUID         NOT NULL REFERENCES main_template(id),
   -- [5] name lives here — stable identity across all versions
   name            VARCHAR(255) NOT NULL,
+  description     TEXT,                  -- optional user-provided description, stable across versions
   -- Denormalized pointer to current COMPLETED version.
   -- Avoids joining + status filtering to find latest version.
   -- Only updated after generated_spec reaches COMPLETED.
@@ -210,6 +225,11 @@ CREATE TABLE generated_spec (
   --     this column tracks the exact version snapshot used per generation
   template_version_id UUID        NOT NULL REFERENCES template(id),
   version             INT         NOT NULL DEFAULT 1,
+  -- flagged false when a newer version is generated
+  is_active           BOOLEAN     NOT NULL DEFAULT TRUE,
+  -- how user provided MOM: 'TEXT' (plain text paste) | 'FILE' (file upload)
+  -- content always uploaded to S3 regardless — this is for display/analytics only
+  mom_input_type      VARCHAR(10) NOT NULL DEFAULT 'TEXT',
   mom_s3_key          VARCHAR(500),
   mom_s3_bucket       VARCHAR(255),
   -- AI generation metadata
@@ -239,6 +259,7 @@ CREATE TABLE generated_spec_section (
   spec_id             UUID        NOT NULL REFERENCES generated_spec(id),
   template_section_id UUID        NOT NULL REFERENCES template_section(id),
   sort_order          INT         NOT NULL DEFAULT 0,  -- mirrors template_section.sort_order at generation time
+  is_active           BOOLEAN     NOT NULL DEFAULT TRUE,
   detail              TEXT,
   created_by          UUID        REFERENCES "user"(id),
   created_on          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -255,6 +276,8 @@ CREATE TABLE spec_risk (
   spec_id        UUID        NOT NULL REFERENCES generated_spec(id),
   section_id     UUID        REFERENCES generated_spec_section(id),  -- nullable: some risks may be spec-level
   risk_type_id   UUID        NOT NULL REFERENCES risk_type(id),
+  priority       VARCHAR(10) NOT NULL DEFAULT 'MEDIUM',  -- 'HIGH' | 'MEDIUM' | 'LOW' — AI-determined
+  is_active      BOOLEAN     NOT NULL DEFAULT TRUE,
   detail         TEXT,
   reference_text TEXT,
   created_by     UUID        REFERENCES "user"(id),
@@ -266,12 +289,35 @@ CREATE TABLE spec_risk (
 );
 
 
+
+-- ============================================================
+-- AUDIT LOG
+-- No BaseEntity inheritance — audit log does not audit itself
+-- No soft delete — audit records are permanent
+-- entity_id has no FK constraint — survives even if entity is deleted
+-- changed_by nullable — worker has no userId
+-- ============================================================
+
+CREATE TABLE audit_log (
+  id             UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+  entity         VARCHAR(100) NOT NULL,   -- e.g. 'GeneratedSpec', 'Template'
+  entity_id      UUID         NOT NULL,   -- intentionally no FK constraint
+  action         VARCHAR(20)  NOT NULL,   -- 'CREATE' | 'UPDATE' | 'DELETE'
+  changed_fields JSONB,                   -- null on CREATE/DELETE, diff on UPDATE
+  changed_by     UUID         REFERENCES "user"(id) ON DELETE SET NULL,
+  changed_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
 -- ============================================================
 -- INDEXES
 -- ============================================================
 
 -- User
 CREATE INDEX idx_user_email ON "user"(email);
+
+-- Audit log
+CREATE INDEX idx_audit_log_entity     ON audit_log(entity, entity_id);
+CREATE INDEX idx_audit_log_changed_by ON audit_log(changed_by);
 
 -- Template chain
 CREATE INDEX idx_main_template_user        ON main_template(user_id, deleted_on);
@@ -297,15 +343,15 @@ INSERT INTO language (code, name) VALUES
   ('TH', 'Thai'),
   ('EN', 'English');
 
-INSERT INTO spec_status (name) VALUES
-  ('PROCESSING'),
-  ('COMPLETED'),
-  ('FAILED'),
-  ('REVIEWED');
+INSERT INTO spec_status (code, name) VALUES
+  ('PROCESSING', 'Processing'),
+  ('COMPLETED',  'Completed'),
+  ('FAILED',     'Failed'),
+  ('REVIEWED',   'Reviewed');
 
-INSERT INTO risk_type (name) VALUES
-  ('AMBIGUOUS_LANGUAGE'),
-  ('MISSING_OWNER'),
-  ('NO_TIMELINE'),
-  ('ASSUMED_FACT'),
-  ('UNCLEAR_SCOPE');
+INSERT INTO risk_type (code, name) VALUES
+  ('AMBIGUOUS_LANGUAGE', 'Ambiguous Language'),
+  ('MISSING_OWNER',      'Missing Owner'),
+  ('NO_TIMELINE',        'No Timeline'),
+  ('ASSUMED_FACT',       'Assumed Fact'),
+  ('UNCLEAR_SCOPE',      'Unclear Scope');
