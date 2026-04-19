@@ -3,7 +3,8 @@ import { z } from "zod";
 export const LanguageSchema = z.enum(["EN", "TH"]);
 
 export const TemplateSchema = z.object({
-  id: z.string(),
+  id: z.uuid(),
+  versionId: z.uuid(),
   name: z.string(),
   description: z.string(),
   language: LanguageSchema,
@@ -26,6 +27,7 @@ export type TemplateSectionDto = z.infer<typeof TemplateSectionSchema>;
 
 export const TemplateDetailSchema = z.object({
   id: z.uuid(),
+  versionId: z.uuid(),
   name: z.string().trim().min(1, { message: "Template name is required" }),
   description: z.string().trim(),
   language: LanguageSchema,
@@ -49,6 +51,7 @@ export type CreateTemplateDto = z.infer<typeof CreateTemplateSchema>;
 
 export const UpdateTemplateSchema = z.object({
   id: z.uuid(),
+  versionId: z.uuid(),
   name: z.string().trim().min(1, { message: "Template name is required" }),
   description: z.string().trim(),
   language: LanguageSchema,
