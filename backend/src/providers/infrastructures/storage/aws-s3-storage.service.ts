@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import {
   DeleteObjectCommand,
   GetObjectCommand,
+  HeadObjectCommand,
   ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
@@ -93,6 +94,21 @@ export class AwsS3StorageService implements IStorageService {
       );
       stream.on('error', reject);
     });
+  }
+
+  async headFile(key: string): Promise<{ contentType?: string }> {
+    if (!this.bucket) {
+      throw new Error('AWS_S3_BUCKET is not set');
+    }
+
+    const result = await this.client.send(
+      new HeadObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+      }),
+    );
+
+    return { contentType: result.ContentType };
   }
 
   async listFiles(prefix = ''): Promise<string[]> {

@@ -1,6 +1,21 @@
 import { IMainGenerateSpecRepository } from './main-genereate-spec.repository.interface';
 
 export class MockMainGenerateSpecRepository implements IMainGenerateSpecRepository {
+  findAll = jest.fn().mockResolvedValue({
+    items: [
+      {
+        id: 'mock-id',
+        user: { id: 'mock-user-id' },
+        template: { id: 'mock-template-id' },
+        name: 'mock-name',
+        currentVersion: { id: 'mock-current-version-id' },
+        generatedSpecs: [{ id: 'mock-generated-spec-id' }],
+      },
+    ],
+    totalCount: 1,
+    page: 1,
+    limit: 10,
+  });
   findById = jest.fn().mockResolvedValue({
     id: 'mock-id',
     user: { id: 'mock-user-id' },
@@ -9,6 +24,15 @@ export class MockMainGenerateSpecRepository implements IMainGenerateSpecReposito
     currentVersion: { id: 'mock-current-version-id' },
     generatedSpecs: [{ id: 'mock-generated-spec-id' }],
   });
+  findByMainAndVersionId = jest.fn().mockResolvedValue({
+    id: 'mock-id',
+    user: { id: 'mock-user-id' },
+    template: { id: 'mock-template-id' },
+    name: 'mock-name',
+    currentVersion: { id: 'mock-current-version-id' },
+    generatedSpecs: [{ id: 'mock-generated-spec-id' }],
+  });
+  findVersions = jest.fn().mockResolvedValue([]);
   create = jest.fn().mockResolvedValue({
     id: 'mock-id',
     user: { id: 'mock-user-id' },

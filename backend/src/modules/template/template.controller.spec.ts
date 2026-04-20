@@ -22,6 +22,7 @@ describe('TemplateController', () => {
 
   const detail: TemplateDetailDto = {
     id: '123e4567-e89b-12d3-a456-426614174000',
+    versionId: '323e4567-e89b-12d3-a456-426614174000',
     name: 'Test Template',
     description: 'Test description',
     language: 'EN',
@@ -31,6 +32,7 @@ describe('TemplateController', () => {
   const list: TemplateDto[] = [
     {
       id: '223e4567-e89b-12d3-a456-426614174000',
+      versionId: '423e4567-e89b-12d3-a456-426614174000',
       name: 'List item',
       description: 'Desc',
       language: 'EN',
@@ -123,6 +125,7 @@ describe('TemplateController', () => {
       const id = '123e4567-e89b-12d3-a456-426614174000';
       const body: UpdateTemplateDto = {
         id,
+        versionId: detail.versionId,
         name: 'Updated',
         description: 'Desc',
         language: 'TH',

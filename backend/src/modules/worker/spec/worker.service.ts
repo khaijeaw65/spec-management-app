@@ -45,6 +45,8 @@ export class SpecWorkerService {
       SpecStatusCode.PROCESSING,
     );
 
+    console.log('process job');
+
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       try {
         await this.processJob(generatedSpecId);

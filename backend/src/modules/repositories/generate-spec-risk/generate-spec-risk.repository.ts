@@ -8,17 +8,17 @@ import { DeepPartial, DeleteResult, Repository, UpdateResult } from 'typeorm';
 export class GenerateSpecRiskRepository implements IGenerateSpecRiskRepository {
   constructor(
     @InjectRepository(SpecRiskEntity)
-    private readonly generateSpecRiskRepository: Repository<SpecRiskEntity>,
+    private readonly repo: Repository<SpecRiskEntity>,
   ) {}
 
   findById(id: string): Promise<SpecRiskEntity | null> {
-    return this.generateSpecRiskRepository.findOne({
+    return this.repo.findOne({
       where: { id, isActive: true },
     });
   }
 
   findBySpecId(specId: string): Promise<SpecRiskEntity[]> {
-    return this.generateSpecRiskRepository.find({
+    return this.repo.find({
       where: { spec: { id: specId }, isActive: true },
     });
   }
@@ -26,32 +26,32 @@ export class GenerateSpecRiskRepository implements IGenerateSpecRiskRepository {
   create(
     generateSpecRisk: DeepPartial<SpecRiskEntity>,
   ): Promise<SpecRiskEntity> {
-    return this.generateSpecRiskRepository.save(generateSpecRisk);
+    return this.repo.save(generateSpecRisk);
   }
 
   createMany(
     generateSpecRisks: DeepPartial<SpecRiskEntity>[],
   ): Promise<SpecRiskEntity[]> {
-    return this.generateSpecRiskRepository.save(generateSpecRisks);
+    return this.repo.save(generateSpecRisks);
   }
 
   update(
     generateSpecRisk: DeepPartial<SpecRiskEntity>,
   ): Promise<SpecRiskEntity> {
-    return this.generateSpecRiskRepository.save(generateSpecRisk);
+    return this.repo.save(generateSpecRisk);
   }
 
   updateMany(
     generateSpecRisks: DeepPartial<SpecRiskEntity>[],
   ): Promise<SpecRiskEntity[]> {
-    return this.generateSpecRiskRepository.save(generateSpecRisks);
+    return this.repo.save(generateSpecRisks);
   }
 
   delete(id: string): Promise<DeleteResult> {
-    return this.generateSpecRiskRepository.delete(id);
+    return this.repo.delete(id);
   }
 
   softDelete(id: string): Promise<UpdateResult> {
-    return this.generateSpecRiskRepository.update(id, { isActive: false });
+    return this.repo.update(id, { isActive: false });
   }
 }

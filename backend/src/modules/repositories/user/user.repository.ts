@@ -8,11 +8,11 @@ import { IUserRepository } from './user.repository.interface';
 export class UserRepository implements IUserRepository {
   constructor(
     @InjectRepository(UserEntity)
-    private readonly userRepository: Repository<UserEntity>,
+    private readonly repo: Repository<UserEntity>,
   ) {}
 
   async findByEmail(email: string) {
-    return this.userRepository.findOne({
+    return this.repo.findOne({
       where: { email, isActive: true },
       select: {
         id: true,
@@ -24,7 +24,7 @@ export class UserRepository implements IUserRepository {
   }
 
   async findByEmailWithPassword(email: string) {
-    return this.userRepository.findOne({
+    return this.repo.findOne({
       where: { email, isActive: true },
       select: {
         id: true,
@@ -37,7 +37,7 @@ export class UserRepository implements IUserRepository {
   }
 
   async findById(id: string) {
-    return this.userRepository.findOne({
+    return this.repo.findOne({
       where: { id, isActive: true },
       select: {
         id: true,
@@ -49,21 +49,21 @@ export class UserRepository implements IUserRepository {
   }
 
   async create(user: DeepPartial<UserEntity>) {
-    return this.userRepository.save(user);
+    return this.repo.save(user);
   }
 
   async update(user: DeepPartial<UserEntity>) {
-    return this.userRepository.save(user);
+    return this.repo.save(user);
   }
 
   async delete(id: string) {
-    return await this.userRepository.delete({
+    return await this.repo.delete({
       id,
       isActive: true,
     });
   }
 
   async softDelete(id: string) {
-    return await this.userRepository.update(id, { isActive: false });
+    return await this.repo.update(id, { isActive: false });
   }
 }

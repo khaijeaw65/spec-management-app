@@ -8,11 +8,11 @@ import { DeepPartial, Repository } from 'typeorm';
 export class TemplateRepository implements ITemplateRepository {
   constructor(
     @InjectRepository(TemplateEntity)
-    private readonly templateRepository: Repository<TemplateEntity>,
+    private readonly repo: Repository<TemplateEntity>,
   ) {}
 
   async findByUserId(userId: string) {
-    return this.templateRepository.find({
+    return this.repo.find({
       where: {
         mainTemplate: {
           user: {
@@ -30,7 +30,7 @@ export class TemplateRepository implements ITemplateRepository {
   }
 
   async findById(id: string) {
-    return this.templateRepository.findOne({
+    return this.repo.findOne({
       where: {
         id,
         isActive: true,
@@ -46,18 +46,18 @@ export class TemplateRepository implements ITemplateRepository {
   }
 
   async create(template: DeepPartial<TemplateEntity>) {
-    return this.templateRepository.save(template);
+    return this.repo.save(template);
   }
 
   async update(template: DeepPartial<TemplateEntity>) {
-    return this.templateRepository.save(template);
+    return this.repo.save(template);
   }
 
   async delete(id: string) {
-    return this.templateRepository.delete(id);
+    return this.repo.delete(id);
   }
 
   async softDelete(id: string) {
-    return this.templateRepository.update(id, { isActive: false });
+    return this.repo.update(id, { isActive: false });
   }
 }

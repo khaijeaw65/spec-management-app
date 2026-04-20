@@ -8,12 +8,18 @@ import { Repository } from 'typeorm';
 export class LanguageRepository implements ILanguageRepository {
   constructor(
     @InjectRepository(LanguageEntity)
-    private readonly languageRepository: Repository<LanguageEntity>,
+    private readonly repo: Repository<LanguageEntity>,
   ) {}
 
+  async findAll(): Promise<LanguageEntity[]> {
+    return this.repo.find({
+      where: { isActive: true },
+    });
+  }
+
   async findByCode(code: string): Promise<LanguageEntity | null> {
-    return this.languageRepository.findOne({
-      where: { code },
+    return this.repo.findOne({
+      where: { code, isActive: true },
     });
   }
 }

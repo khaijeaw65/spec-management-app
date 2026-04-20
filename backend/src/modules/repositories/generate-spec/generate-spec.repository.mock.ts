@@ -1,10 +1,16 @@
 import { IGenerateSpecRepository } from './generate-spec.repository.interface';
 
 export class MockGenerateSpecRepository implements IGenerateSpecRepository {
-  findAll = jest.fn().mockResolvedValue([]);
   findById = jest.fn().mockResolvedValue({
     id: 'mock-id',
     mainSpec: { id: 'mock-main-spec-id' },
+    language: { id: 'mock-language-id' },
+    status: { id: 'mock-status-id' },
+    templateVersion: { id: 'mock-template-version-id' },
+  });
+  findByIdWithMainUser = jest.fn().mockResolvedValue({
+    id: 'mock-id',
+    mainSpec: { id: 'mock-main-spec-id', user: { id: 'mock-user-id' } },
     language: { id: 'mock-language-id' },
     status: { id: 'mock-status-id' },
     templateVersion: { id: 'mock-template-version-id' },
@@ -17,6 +23,7 @@ export class MockGenerateSpecRepository implements IGenerateSpecRepository {
     templateVersion: { id: 'mock-template-version-id' },
   });
   findByMainSpecId = jest.fn().mockResolvedValue([]);
+  findVersionsByMainSpecId = jest.fn().mockResolvedValue([]);
   create = jest.fn().mockResolvedValue({ id: 'mock-id', name: 'mock-name' });
   update = jest.fn().mockResolvedValue({ id: 'mock-id', name: 'mock-name' });
   updateStatus = jest

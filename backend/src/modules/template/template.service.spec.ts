@@ -1,4 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { ClsModule } from 'nestjs-cls';
+import {
+  ClsPluginTransactional,
+  NoOpTransactionalAdapter,
+} from '@nestjs-cls/transactional';
 import { TemplateService } from './template.service';
 import { MockMainTemplateRepository } from '../repositories/main-template/main-template.repository.mock';
 import { MockLanguageRepository } from '../repositories/language/language.repository.mock';
@@ -8,6 +13,8 @@ import { ILanguageRepository } from '../repositories/language/language.repositor
 import { IRequestContextService } from '../../contexts/request/interfaces/request.context.interface';
 import { IMainTemplateRepository } from '../repositories/main-template/main-template.repository.interface';
 import { ITemplateRepository } from '../repositories/template/template.repository.interface';
+import { ITemplateSectionRepository } from '../template-section/template-section.repository.interface';
+import { MockTemplateSectionRepository } from '../template-section/template-section.repository.mock';
 
 describe('TemplateService', () => {
   let service: TemplateService;
@@ -18,6 +25,18 @@ describe('TemplateService', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
+      imports: [
+        ClsModule.forRoot({
+          plugins: [
+            new ClsPluginTransactional({
+              adapter: new NoOpTransactionalAdapter({
+                tx: {},
+                disableWarning: true,
+              }),
+            }),
+          ],
+        }),
+      ],
       providers: [
         TemplateService,
         {
@@ -27,6 +46,10 @@ describe('TemplateService', () => {
         {
           provide: ITemplateRepository,
           useClass: MockTemplateRepository,
+        },
+        {
+          provide: ITemplateSectionRepository,
+          useClass: MockTemplateSectionRepository,
         },
         {
           provide: ILanguageRepository,
@@ -107,6 +130,7 @@ describe('TemplateService', () => {
         description: 'Test Description',
         language: { code: 'invalid' },
         currentVersion: {
+          id: '1',
           name: 'Test Version',
           description: 'Test Description',
           templateSections: [],
@@ -162,6 +186,7 @@ describe('TemplateService', () => {
         description: 'Test Description',
         language: { code: 'EN' },
         currentVersion: {
+          id: '1',
           name: 'Test Version',
           description: 'Test Description',
           templateSections: [],
@@ -170,6 +195,7 @@ describe('TemplateService', () => {
       });
       templateRepository.findById.mockResolvedValueOnce({
         id: '1',
+        mainTemplate: { id: '1' },
         name: 'Test Template',
         description: 'Test Description',
         templateSections: [],
@@ -182,6 +208,7 @@ describe('TemplateService', () => {
       });
       const template = await service.update('1', {
         id: '1',
+        versionId: '1',
         name: 'Test Template Updated',
         description: 'Test Description Updated',
         language: 'EN',
@@ -198,10 +225,11 @@ describe('TemplateService', () => {
     });
 
     it('should throw an error if the template is not found', async () => {
-      templateRepository.findById.mockResolvedValue(null);
+      mainTemplateRepository.findById.mockResolvedValueOnce(null);
       await expect(
         service.update('1', {
           id: '1',
+          versionId: '1',
           name: 'Test Template',
           description: 'Test Description',
           language: 'EN',

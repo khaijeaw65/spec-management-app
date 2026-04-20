@@ -19,7 +19,7 @@ import {
 } from '@spec-app/schemas';
 
 @ApiTags('User')
-@Controller('user')
+@Controller('users')
 export class UserController {
   constructor(private readonly userService: UserService) {}
 

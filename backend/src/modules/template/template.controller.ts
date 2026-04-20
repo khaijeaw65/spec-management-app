@@ -32,7 +32,7 @@ import {
 } from '../../swagger/zod-to-openapi';
 
 @ApiTags('Template')
-@Controller('template')
+@Controller('templates')
 export class TemplateController {
   constructor(private readonly templateService: TemplateService) {}
 

@@ -19,15 +19,22 @@ import { RiskTypeEntity } from 'src/entities/risk-type.entity';
 import { LoggerService } from '../../utils/logger/logger.service';
 import {
   CreateSpecDto,
-  SpecDto,
+  GenerateSpecResponseDto,
+  LanguageCodeSchema,
+  RiskPrioritySchema,
+  RiskTypeSchema,
+  type SpecDetailDto,
   SpecListQuery,
-  SpecStatusSchema,
+  SpecListResponseDto,
+  SpecStatusCodeSchema,
 } from '@spec-app/schemas';
 import { IStorageService } from '../storage/ports/storage.service.interface';
 import { IQueueService } from '../queue/ports/queue.service.interface';
 import { IRequestContextService } from '../../contexts/request/interfaces/request.context.interface';
 import { ILanguageRepository } from '../repositories/language/language.repository.interface';
-import { IMainTemplateRepository } from '../repositories/main-template/main-template.repository.interface';
+import { RiskTypeCode } from 'src/types/risk-type-code.enum';
+import { LanguageCode } from 'src/types/language-code.enum';
+import { RiskPriority } from 'src/types/risk-priority.enum';
 
 @Injectable()
 export class SpecService implements ISpecService {
@@ -37,7 +44,6 @@ export class SpecService implements ISpecService {
     private readonly riskTypeRepository: IRiskTypeRepository,
     private readonly generateSpecRiskRepository: IGenerateSpecRiskRepository,
     private readonly mainGenerateSpecRepository: IMainGenerateSpecRepository,
-    private readonly mainTemplateRepository: IMainTemplateRepository,
     private readonly specStatusRepository: ISpecStatusRepository,
     private readonly storageService: IStorageService,
     private readonly logger: LoggerService,
@@ -46,22 +52,92 @@ export class SpecService implements ISpecService {
     private readonly languageRepository: ILanguageRepository,
   ) {}
 
-  async getSpecs(query: SpecListQuery): Promise<SpecDto[]> {
-    const specs = await this.generateSpecRepository.findAll(query);
+  async getSpecs(query: SpecListQuery): Promise<SpecListResponseDto> {
+    const { items, totalCount, page, limit } =
+      await this.mainGenerateSpecRepository.findAll(query);
 
-    return specs.map((spec) => ({
-      id: spec.mainSpec.id,
-      versionId: spec.id,
-      name: spec.mainSpec.name,
-      templateName: spec.templateVersion.name,
-      version: spec.version,
-      sectionCount: spec.templateVersion.templateSections.length,
+    console.log('get specs', items);
+
+    return {
+      items: items.map((spec) => ({
+        id: spec.id,
+        versionId: spec.currentVersion?.id ?? '',
+        name: spec.name,
+        templateName: spec.template.currentVersion!.name,
+        version: spec.currentVersion?.version ?? 1,
+        sectionCount:
+          spec.currentVersion?.templateVersion?.templateSectionsCount ?? 0,
+        status:
+          SpecStatusCodeSchema.safeParse(spec.currentVersion?.status?.code)
+            .data ?? SpecStatusCode.PENDING,
+        language: spec.currentVersion?.language?.code ?? LanguageCode.EN,
+        updatedAt: spec.updatedOn.toISOString(),
+      })),
+      totalCount,
+      page,
+      limit,
+    };
+  }
+
+  async getByMainAndVersionId(
+    mainSpecId: string,
+    versionId: string,
+  ): Promise<SpecDetailDto> {
+    const spec = await this.mainGenerateSpecRepository.findByMainAndVersionId(
+      mainSpecId,
+      versionId,
+    );
+    if (!spec) throw new NotFoundException('Spec not found');
+
+    const versions =
+      await this.generateSpecRepository.findVersionsByMainSpecId(mainSpecId);
+
+    return {
+      id: spec.id,
+      versionId: spec.currentVersion?.id ?? '',
+      name: spec.name,
+      templateName: spec.template?.currentVersion?.name ?? '',
+      description: spec.description ?? undefined,
       status:
-        SpecStatusSchema.safeParse(spec.status.code).data ??
-        SpecStatusCode.PENDING,
-      language: spec.language.name,
+        SpecStatusCodeSchema.safeParse(spec.currentVersion?.status?.code)
+          .data ?? SpecStatusCode.PENDING,
+      language:
+        LanguageCodeSchema.safeParse(spec.currentVersion?.language?.code)
+          .data ?? LanguageCode.EN,
+      version: spec.currentVersion?.version ?? 1,
+      createdByName: spec.user.firstName + ' ' + spec.user.lastName,
+      createdAt: spec.createdOn.toISOString(),
       updatedAt: spec.updatedOn.toISOString(),
-    }));
+      momFile: await this.buildMomFileDto(spec.currentVersion ?? undefined),
+      sections:
+        spec.currentVersion?.templateVersion?.templateSections.map(
+          (section) => ({
+            id: section.id,
+            title: section.title,
+            description: section.description ?? undefined,
+            detail: section.description ?? undefined,
+          }),
+        ) ?? [],
+      risks:
+        spec.currentVersion?.specRisks.map((risk) => ({
+          id: risk.id,
+          sectionTitle: risk.section?.templateSection.title ?? 'Unknown',
+          riskType:
+            RiskTypeSchema.safeParse(risk.riskType?.code).data ??
+            RiskTypeCode.AMBIGUOUS_LANGUAGE,
+          priority:
+            RiskPrioritySchema.safeParse(risk.priority).data ??
+            RiskPriority.MEDIUM,
+          detail: risk.detail ?? undefined,
+          referenceText: risk.referenceText ?? undefined,
+        })) ?? [],
+      versions: versions.map((version) => ({
+        id: version.id,
+        version: version.version,
+        createdAt: version.createdOn.toISOString(),
+        updatedAt: version.updatedOn.toISOString(),
+      })),
+    };
   }
 
   async markAsExported(specId: string): Promise<void> {
@@ -71,13 +147,16 @@ export class SpecService implements ISpecService {
     });
   }
 
-  async generateSpec(dto: CreateSpecDto, file?: Express.Multer.File) {
+  async generateSpec(
+    dto: CreateSpecDto,
+    file?: Express.Multer.File,
+  ): Promise<GenerateSpecResponseDto> {
     const preparedMomFile = this.prepareMomFile(dto.momContent, file);
 
-    const createdSpec = await this.createPendingSpec(dto);
+    const { mainSpecId, generatedSpec } = await this.createPendingSpec(dto);
 
     // use spec id as s3 key — traceable and unique
-    const momS3Key = `mom/${createdSpec.id}`;
+    const momS3Key = `mom/${generatedSpec.id}`;
 
     await this.storageService.uploadFile(
       preparedMomFile.buffer,
@@ -87,20 +166,25 @@ export class SpecService implements ISpecService {
 
     // update spec with s3 key after upload
     await this.generateSpecRepository.update({
-      ...createdSpec,
+      ...generatedSpec,
       momS3Key,
     });
 
     await this.queueService.sendMessage(
       JSON.stringify({
         type: 'GENERATE_SPEC',
-        generatedSpecId: createdSpec.id,
+        generatedSpecId: generatedSpec.id,
       }),
     );
+
+    return {
+      id: mainSpecId,
+      versionId: generatedSpec.id,
+    };
   }
 
   private prepareMomFile(
-    momContent?: string,
+    momContent: string | undefined,
     file?: Express.Multer.File,
   ): { buffer: Buffer; contentType: string } {
     if (file) {
@@ -120,7 +204,10 @@ export class SpecService implements ISpecService {
     throw new BadRequestException('Either momContent or file must be provided');
   }
 
-  private async createPendingSpec(spec: CreateSpecDto) {
+  private async createPendingSpec(spec: CreateSpecDto): Promise<{
+    mainSpecId: string;
+    generatedSpec: GeneratedSpecEntity;
+  }> {
     const language = await this.languageRepository.findByCode(spec.language);
 
     const createdMainSpec = await this.mainGenerateSpecRepository.create({
@@ -148,9 +235,18 @@ export class SpecService implements ISpecService {
       language: { id: language?.id },
       status: { id: pendingStatus.id },
       momInputType: spec.inputType,
+      version: 1,
     });
 
-    return createdGeneratedSpec;
+    await this.mainGenerateSpecRepository.update({
+      id: createdMainSpec.id,
+      currentVersion: { id: createdGeneratedSpec.id },
+    });
+
+    return {
+      mainSpecId: createdMainSpec.id,
+      generatedSpec: createdGeneratedSpec,
+    };
   }
 
   public async getSpecForGeneration(specId: string) {
@@ -280,6 +376,95 @@ export class SpecService implements ISpecService {
       throw new NotFoundException('Spec status not found');
     }
     await this.generateSpecRepository.updateStatus(specId, specStatus.id);
+  }
+
+  public async updateSpecStatusForMainSpec(
+    mainSpecId: string,
+    status: SpecStatusCode,
+  ): Promise<void> {
+    const main = await this.mainGenerateSpecRepository.findById(mainSpecId);
+    if (!main?.currentVersion?.id) {
+      throw new NotFoundException('Specification not found');
+    }
+    await this.updateSpecStatus(main.currentVersion.id, status);
+  }
+
+  async getMomFileResponse(versionId: string): Promise<{
+    buffer: Buffer;
+    contentType: string;
+    fileName: string;
+  }> {
+    const userId = this.requestContextService.userId;
+    const spec =
+      await this.generateSpecRepository.findByIdWithMainUser(versionId);
+    if (!spec?.momS3Key?.length || !spec.mainSpec?.user) {
+      throw new NotFoundException('MOM not found');
+    }
+    if (spec.mainSpec.user.id !== userId) {
+      throw new NotFoundException('MOM not found');
+    }
+    const meta = await this.resolveMomMeta(spec);
+    const file = await this.storageService.getFile(spec.momS3Key);
+    return {
+      buffer: file.buffer,
+      contentType: this.contentTypeForMomExt(meta.extension),
+      fileName: meta.fileName,
+    };
+  }
+
+  private async buildMomFileDto(
+    version: GeneratedSpecEntity | null | undefined,
+  ): Promise<SpecDetailDto['momFile']> {
+    if (!version?.momS3Key) {
+      return null;
+    }
+    return this.resolveMomMeta(version);
+  }
+
+  private async resolveMomMeta(spec: GeneratedSpecEntity): Promise<{
+    fileName: string;
+    extension: 'txt' | 'pdf' | 'docx';
+  }> {
+    if (!spec.momS3Key) {
+      throw new NotFoundException('MOM not found');
+    }
+    if (spec.momInputType === 'TEXT') {
+      return { fileName: 'meeting-notes.txt', extension: 'txt' };
+    }
+    const head = await this.storageService.headFile(spec.momS3Key);
+    const extension = this.mimeToMomExt(head.contentType);
+    return { fileName: `meeting-notes.${extension}`, extension };
+  }
+
+  private mimeToMomExt(
+    contentType: string | undefined,
+  ): 'txt' | 'pdf' | 'docx' {
+    const ct = contentType?.split(';')[0]?.trim().toLowerCase();
+    switch (ct) {
+      case 'text/plain':
+        return 'txt';
+      case 'application/pdf':
+        return 'pdf';
+      case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+        return 'docx';
+      default:
+        return 'txt';
+    }
+  }
+
+  private contentTypeForMomExt(ext: 'txt' | 'pdf' | 'docx'): string {
+    switch (ext) {
+      case 'txt':
+        return 'text/plain';
+      case 'pdf':
+        return 'application/pdf';
+      case 'docx':
+        return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      default: {
+        const _e: never = ext;
+        return _e;
+      }
+    }
   }
 
   private parseGenerationResult(result: LlmResponse): GeneratedSpecOutput {

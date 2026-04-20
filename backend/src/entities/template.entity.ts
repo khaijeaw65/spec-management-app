@@ -40,6 +40,9 @@ export class TemplateEntity extends BaseEntity {
   )
   templateSections: TemplateSectionEntity[];
 
+  /** Populated by QueryBuilder `loadRelationCountAndMap` for list queries. */
+  templateSectionsCount?: number;
+
   @OneToMany(
     () => GeneratedSpecEntity,
     (generatedSpec) => generatedSpec.templateVersion,

@@ -2,4 +2,5 @@ import { ITemplateSectionRepository } from './template-section.repository.interf
 
 export class MockTemplateSectionRepository implements ITemplateSectionRepository {
   createMany = jest.fn().mockResolvedValue([]);
+  updateMany = jest.fn().mockResolvedValue([]);
 }

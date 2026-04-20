@@ -6,7 +6,7 @@ import { UserModule } from './modules/user/user.module';
 import { ConfigModule } from '@nestjs/config';
 import { DatabaseModule } from './providers/database/database.module';
 import { AuthModule } from './modules/auth/auth.module';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { TemplateModule } from './modules/template/template.module';
 import { SpecModule } from './modules/spec/spec.module';
@@ -17,6 +17,9 @@ import { LoggerModule } from './utils/logger/logger.module';
 import { ClsPluginTransactional } from '@nestjs-cls/transactional';
 import { TransactionalAdapterTypeOrm } from '@nestjs-cls/transactional-adapter-typeorm';
 import { DataSource } from 'typeorm';
+import { LanguageModule } from './modules/language/language.module';
+import { SpecStatusModule } from './modules/spec-status/spec-status.module';
+import { TransformResponseInterceptor } from './interceptors/transfrom-response.interceptor';
 
 @Module({
   imports: [
@@ -45,6 +48,8 @@ import { DataSource } from 'typeorm';
     AuthModule,
     TemplateModule,
     SpecModule,
+    LanguageModule,
+    SpecStatusModule,
   ],
   controllers: [AppController],
   providers: [
@@ -52,6 +57,10 @@ import { DataSource } from 'typeorm';
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: TransformResponseInterceptor,
     },
   ],
 })

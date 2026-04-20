@@ -16,4 +16,10 @@ export class TemplateSectionRepository implements ITemplateSectionRepository {
   ): Promise<TemplateSectionEntity[]> {
     return this.templateSectionRepository.save(sections);
   }
+
+  updateMany(
+    sections: DeepPartial<TemplateSectionEntity>[],
+  ): Promise<TemplateSectionEntity[]> {
+    return this.templateSectionRepository.save(sections);
+  }
 }

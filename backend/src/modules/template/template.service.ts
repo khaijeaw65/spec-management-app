@@ -8,7 +8,7 @@ import { IMainTemplateRepository } from '../repositories/main-template/main-temp
 import { ITemplateRepository } from '../repositories/template/template.repository.interface';
 import {
   type CreateTemplateDto,
-  LanguageSchema,
+  LanguageCodeSchema,
   TemplateDetailDto,
   TemplateDto,
   UpdateTemplateDto,
@@ -33,7 +33,9 @@ export class TemplateService implements ITemplateService {
     const templates = await this.mainTemplateRepository.findByUserId(userId);
 
     return templates.map((template) => {
-      const languageResult = LanguageSchema.safeParse(template.language.code);
+      const languageResult = LanguageCodeSchema.safeParse(
+        template.language?.code ?? '',
+      );
 
       if (!languageResult.success) {
         throw new InternalServerErrorException('Failed to parse language code');
@@ -46,7 +48,7 @@ export class TemplateService implements ITemplateService {
         description: template.currentVersion?.description ?? '',
         language: languageResult.data,
         createdOn: template.createdOn,
-        sectionCount: template.currentVersion?.templateSections.length ?? 0,
+        sectionCount: template.currentVersion?.templateSectionsCount ?? 0,
       };
     });
   }
@@ -58,7 +60,7 @@ export class TemplateService implements ITemplateService {
       throw new NotFoundException('Template not found');
     }
 
-    const languageResult = LanguageSchema.safeParse(template.language.code);
+    const languageResult = LanguageCodeSchema.safeParse(template.language.code);
 
     if (!languageResult.success) {
       throw new InternalServerErrorException('Failed to parse language code');
@@ -72,6 +74,7 @@ export class TemplateService implements ITemplateService {
       language: languageResult.data,
       sections:
         template.currentVersion?.templateSections.map((section) => ({
+          id: section.id,
           title: section.title,
           description: section.description ?? '',
           order: section.sortOrder,
@@ -143,34 +146,57 @@ export class TemplateService implements ITemplateService {
     };
   }
 
-  async update(id: string, template: UpdateTemplateDto) {
-    const existingTemplate = await this.templateRepository.findById(id);
+  async update(mainTemplateId: string, template: UpdateTemplateDto) {
+    const main = await this.mainTemplateRepository.findById(mainTemplateId);
+
+    if (!main?.currentVersion) {
+      throw new NotFoundException('Template not found');
+    }
+
+    if (template.id !== main.id) {
+      throw new BadRequestException('Template id mismatch');
+    }
+
+    if (template.versionId !== main.currentVersion.id) {
+      throw new BadRequestException(
+        'This template was updated elsewhere. Refresh and try again.',
+      );
+    }
+
+    const existingTemplate = await this.templateRepository.findById(
+      main.currentVersion.id,
+    );
 
     if (!existingTemplate) {
-      throw new NotFoundException('Template not found');
+      throw new NotFoundException('Template version not found');
     }
 
     const updatedTemplate = {
       ...existingTemplate,
       name: template.name,
       description: template.description,
-      templateSections: template.sections.map((section) => ({
-        name: section.title,
+    };
+
+    await this.templateSectionRepository.updateMany(
+      template.sections.map((section) => ({
+        id: section.id,
+        title: section.title,
+        template: {
+          id: existingTemplate.id,
+        },
         description: section.description,
         sortOrder: section.order,
       })),
-    };
-
-    await this.templateRepository.update(updatedTemplate);
+    );
 
     return {
-      id: existingTemplate.mainTemplate.id,
-      versionId: updatedTemplate.id,
+      id: main.id,
+      versionId: existingTemplate.id,
       name: updatedTemplate.name,
       description: updatedTemplate.description ?? '',
       language: template.language,
       sections: updatedTemplate.templateSections.map((section) => ({
-        title: section.name,
+        title: section.title,
         description: section.description ?? '',
         order: section.sortOrder,
       })),
@@ -216,7 +242,7 @@ export class TemplateService implements ITemplateService {
       existingTemplate.currentVersion?.id ?? '',
     );
 
-    const languageResult = LanguageSchema.safeParse(
+    const languageResult = LanguageCodeSchema.safeParse(
       existingTemplate.language.code,
     );
 

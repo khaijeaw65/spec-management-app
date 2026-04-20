@@ -1,7 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './exception/http-exception.filter';
-import { TransformResponseInterceptor } from './interceptors/transfrom-response.interceptor';
 import { INestApplication } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { LoggerService } from './utils/logger/logger.service';
@@ -26,7 +25,6 @@ async function bootstrap() {
   });
   app.useLogger(app.get(LoggerService));
   app.useGlobalFilters(new HttpExceptionFilter());
-  app.useGlobalInterceptors(new TransformResponseInterceptor());
 
   app.setGlobalPrefix('api');
   app.enableCors();

@@ -20,5 +20,8 @@ export abstract class IStorageService {
 
   abstract getFile(key: string): Promise<IStorageFile>;
 
+  /** Lightweight metadata (e.g. Content-Type) without downloading the body. */
+  abstract headFile(key: string): Promise<{ contentType?: string }>;
+
   abstract listFiles(prefix?: string): Promise<string[]>;
 }

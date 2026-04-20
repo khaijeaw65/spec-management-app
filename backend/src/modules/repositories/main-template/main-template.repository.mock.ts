@@ -7,6 +7,7 @@ export class MockMainTemplateRepository implements IMainTemplateRepository {
     description: 'Test Description',
     language: { code: 'EN' },
     currentVersion: {
+      id: '1',
       name: 'Test Version',
       description: 'Test Description',
       templateSections: [],
@@ -20,6 +21,7 @@ export class MockMainTemplateRepository implements IMainTemplateRepository {
       description: 'Test Description',
       language: { code: 'EN' },
       currentVersion: {
+        id: '1',
         name: 'Test Version',
         description: 'Test Description',
         templateSections: [],

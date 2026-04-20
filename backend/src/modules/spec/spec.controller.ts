@@ -4,6 +4,7 @@ import {
   Controller,
   Get,
   Param,
+  Patch,
   Post,
   Query,
   Res,
@@ -24,9 +25,12 @@ import {
 import {
   type CreateSpecDto,
   CreateSpecSchema,
+  GenerateSpecResponseSchema,
   SpecListQuerySchema,
   type SpecListQuery,
+  SpecDetailSchema,
   SpecListResponseSchema,
+  UpdateSpecStatusSchema,
 } from '@spec-app/schemas';
 import {
   zodToOpenapi,
@@ -35,7 +39,9 @@ import {
 } from '../../swagger/zod-to-openapi';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { momFileOptions } from 'src/utils/file-upload/file-upload.config';
+import { SpecStatusCode } from 'src/types/spec-status-code.enum';
 import type { Response } from 'express';
+import { SkipTransform } from 'src/decorators/skip-transform-response.decorator';
 
 @ApiTags('Spec')
 @Controller('specs')
@@ -54,7 +60,46 @@ export class SpecController {
     return this.specService.getSpecs(query);
   }
 
+  @Get(':mainId/versions/:versionId')
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Get specification detail',
+    description:
+      '`mainId` is the main generated spec id; `versionId` is the generated spec (version row) id.',
+  })
+  @ApiOkResponse({ schema: zodToOpenapiResponse(SpecDetailSchema) })
+  async getSpecDetail(
+    @Param('mainId') mainId: string,
+    @Param('versionId') versionId: string,
+  ) {
+    return this.specService.getByMainAndVersionId(mainId, versionId);
+  }
+
+  @Patch(':id/status')
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Update status of the specification’s current version',
+    description:
+      'Path `id` is the main specification id (same as list/detail).',
+  })
+  @ApiBody({ schema: zodToOpenapi(UpdateSpecStatusSchema) })
+  @ApiOkResponse({ description: 'Status updated' })
+  async updateSpecStatus(
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ): Promise<void> {
+    const parsed = UpdateSpecStatusSchema.safeParse(body);
+    if (!parsed.success) {
+      throw new BadRequestException('Invalid request body');
+    }
+    await this.specService.updateSpecStatusForMainSpec(
+      id,
+      parsed.data.status as SpecStatusCode,
+    );
+  }
+
   @Get(':id/export')
+  @SkipTransform()
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Export spec as PDF' })
   async exportPdf(
@@ -71,10 +116,33 @@ export class SpecController {
     res.send(buffer);
   }
 
+  @Get(':id/mom')
+  @SkipTransform()
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Download original MOM',
+    description:
+      'Path `id` is the generated-spec (version row) id, same as list `versionId`.',
+  })
+  async getMom(
+    @Param('id') id: string,
+    @Res({ passthrough: false }) res: Response,
+  ) {
+    const { buffer, contentType, fileName } =
+      await this.specService.getMomFileResponse(id);
+    res.setHeader('Content-Type', contentType);
+    res.setHeader(
+      'Content-Disposition',
+      `inline; filename="${fileName.replace(/"/g, '')}"`,
+    );
+    res.send(buffer);
+  }
+
   @Post('generate')
   @ApiBearerAuth()
   @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Generate spec' })
+  @ApiOkResponse({ schema: zodToOpenapiResponse(GenerateSpecResponseSchema) })
   @ApiBody({
     schema: zodToOpenapiMultipart(CreateSpecSchema, {
       name: 'E-Commerce Platform Requirements',

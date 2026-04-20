@@ -1,12 +1,23 @@
-import { SpecListQuery } from '@spec-app/schemas';
 import { GeneratedSpecEntity } from 'src/entities/generated-spec.entity';
 import { DeepPartial, UpdateResult, DeleteResult } from 'typeorm';
 
+export type GenerateSpecListResult = {
+  items: GeneratedSpecEntity[];
+  totalCount: number;
+  page: number;
+  limit: number;
+};
+
 export abstract class IGenerateSpecRepository {
-  abstract findAll(query: SpecListQuery): Promise<GeneratedSpecEntity[]>;
   abstract findById(id: string): Promise<GeneratedSpecEntity | null>;
+  abstract findByIdWithMainUser(
+    id: string,
+  ): Promise<GeneratedSpecEntity | null>;
   abstract findByIdForExport(id: string): Promise<GeneratedSpecEntity | null>;
   abstract findByMainSpecId(mainSpecId: string): Promise<GeneratedSpecEntity[]>;
+  abstract findVersionsByMainSpecId(
+    mainSpecId: string,
+  ): Promise<GeneratedSpecEntity[]>;
   abstract create(
     generateSpec: DeepPartial<GeneratedSpecEntity>,
   ): Promise<GeneratedSpecEntity>;

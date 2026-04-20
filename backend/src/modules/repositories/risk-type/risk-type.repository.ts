@@ -8,34 +8,34 @@ import { DeepPartial, DeleteResult, Repository, UpdateResult } from 'typeorm';
 export class RiskTypeRepository implements IRiskTypeRepository {
   constructor(
     @InjectRepository(RiskTypeEntity)
-    private readonly riskTypeRepository: Repository<RiskTypeEntity>,
+    private readonly repo: Repository<RiskTypeEntity>,
   ) {}
 
   findById(id: string): Promise<RiskTypeEntity | null> {
-    return this.riskTypeRepository.findOne({
+    return this.repo.findOne({
       where: { id, isActive: true },
     });
   }
 
   findAll(): Promise<RiskTypeEntity[]> {
-    return this.riskTypeRepository.find({
+    return this.repo.find({
       where: { isActive: true },
     });
   }
 
   create(riskType: DeepPartial<RiskTypeEntity>): Promise<RiskTypeEntity> {
-    return this.riskTypeRepository.save(riskType);
+    return this.repo.save(riskType);
   }
 
   update(riskType: DeepPartial<RiskTypeEntity>): Promise<RiskTypeEntity> {
-    return this.riskTypeRepository.save(riskType);
+    return this.repo.save(riskType);
   }
 
   delete(id: string): Promise<DeleteResult> {
-    return this.riskTypeRepository.delete(id);
+    return this.repo.delete(id);
   }
 
   softDelete(id: string): Promise<UpdateResult> {
-    return this.riskTypeRepository.update(id, { isActive: false });
+    return this.repo.update(id, { isActive: false });
   }
 }

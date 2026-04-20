@@ -8,11 +8,11 @@ import { DeepPartial, DeleteResult, Repository, UpdateResult } from 'typeorm';
 export class GenerateSpecSectionRepository implements IGenerateSpecSectionRepository {
   constructor(
     @InjectRepository(GeneratedSpecSectionEntity)
-    private readonly generateSpecSectionRepository: Repository<GeneratedSpecSectionEntity>,
+    private readonly repo: Repository<GeneratedSpecSectionEntity>,
   ) {}
 
   findById(id: string): Promise<GeneratedSpecSectionEntity | null> {
-    return this.generateSpecSectionRepository.findOne({
+    return this.repo.findOne({
       where: { id, isActive: true },
       relations: {
         spec: true,
@@ -22,7 +22,7 @@ export class GenerateSpecSectionRepository implements IGenerateSpecSectionReposi
   }
 
   findBySpecId(specId: string): Promise<GeneratedSpecSectionEntity[]> {
-    return this.generateSpecSectionRepository.find({
+    return this.repo.find({
       where: { spec: { id: specId }, isActive: true },
       relations: {
         spec: true,
@@ -34,33 +34,33 @@ export class GenerateSpecSectionRepository implements IGenerateSpecSectionReposi
   create(
     generateSpecSection: DeepPartial<GeneratedSpecSectionEntity>,
   ): Promise<GeneratedSpecSectionEntity> {
-    return this.generateSpecSectionRepository.save(generateSpecSection);
+    return this.repo.save(generateSpecSection);
   }
 
   createMany(
     generateSpecSections: DeepPartial<GeneratedSpecSectionEntity>[],
   ): Promise<GeneratedSpecSectionEntity[]> {
-    return this.generateSpecSectionRepository.save(generateSpecSections);
+    return this.repo.save(generateSpecSections);
   }
 
   update(
     generateSpecSection: DeepPartial<GeneratedSpecSectionEntity>,
   ): Promise<GeneratedSpecSectionEntity> {
-    return this.generateSpecSectionRepository.save(generateSpecSection);
+    return this.repo.save(generateSpecSection);
   }
 
   updateMany(
     generateSpecSections: DeepPartial<GeneratedSpecSectionEntity>[],
   ): Promise<GeneratedSpecSectionEntity[]> {
-    return this.generateSpecSectionRepository.save(generateSpecSections);
+    return this.repo.save(generateSpecSections);
   }
 
   delete(id: string): Promise<DeleteResult> {
-    return this.generateSpecSectionRepository.delete(id);
+    return this.repo.delete(id);
   }
 
   softDelete(id: string): Promise<UpdateResult> {
-    return this.generateSpecSectionRepository.update(id, {
+    return this.repo.update(id, {
       isActive: false,
     });
   }

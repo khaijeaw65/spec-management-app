@@ -8,34 +8,40 @@ import { ISpecStatusRepository } from './spec-status.repository.interface';
 export class SpecStatusRepository implements ISpecStatusRepository {
   constructor(
     @InjectRepository(SpecStatusEntity)
-    private readonly specStatusRepository: Repository<SpecStatusEntity>,
+    private readonly repo: Repository<SpecStatusEntity>,
   ) {}
 
+  findAll(): Promise<SpecStatusEntity[]> {
+    return this.repo.find({
+      where: { isActive: true },
+    });
+  }
+
   findById(id: string): Promise<SpecStatusEntity | null> {
-    return this.specStatusRepository.findOne({
+    return this.repo.findOne({
       where: { id, isActive: true },
     });
   }
 
   findByCode(code: string): Promise<SpecStatusEntity | null> {
-    return this.specStatusRepository.findOne({
+    return this.repo.findOne({
       where: { code, isActive: true },
     });
   }
 
   create(specStatus: DeepPartial<SpecStatusEntity>): Promise<SpecStatusEntity> {
-    return this.specStatusRepository.save(specStatus);
+    return this.repo.save(specStatus);
   }
 
   update(specStatus: DeepPartial<SpecStatusEntity>): Promise<SpecStatusEntity> {
-    return this.specStatusRepository.save(specStatus);
+    return this.repo.save(specStatus);
   }
 
   delete(id: string): Promise<DeleteResult> {
-    return this.specStatusRepository.delete(id);
+    return this.repo.delete(id);
   }
 
   softDelete(id: string): Promise<UpdateResult> {
-    return this.specStatusRepository.update(id, { isActive: false });
+    return this.repo.update(id, { isActive: false });
   }
 }

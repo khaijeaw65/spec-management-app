@@ -35,8 +35,6 @@ export class GenAiService implements IGenAiService {
       language,
     );
 
-    console.log(result);
-
     return result;
   }
 
@@ -138,16 +136,12 @@ Respond with a JSON object in this exact structure:
 
 IMPORTANT: sectionName values must exactly match the template section titles provided above.`;
 
-    console.log('begin generate spec');
-
     const result = await this.llmClient.generateText({
       system: GEN_AI_SYSTEM_PROMPT,
       prompt: userPrompt,
       temperature: 0.2,
       json: true,
     });
-
-    console.log('end generate spec');
 
     return {
       text: result.text,
