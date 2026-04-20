@@ -5,12 +5,13 @@ import { MOCK_SPECIFICATIONS } from "@/mocks/spec.mock";
 
 const ECOM_DETAIL: SpecificationDetail = {
   id: "spec-ecom-platform",
+  versionId: "11111111-1111-4111-8111-111111111101",
   title: "E-Commerce Platform Requirements",
   description:
     "Complete specification for building a modern e-commerce platform.",
   templateLabel: "Standard Template",
   status: "REVIEWED",
-  language: "en",
+  language: "EN",
   version: 2,
   createdByName: "John Doe",
   createdAt: "2024-03-10T10:00:00.000Z",
@@ -102,6 +103,7 @@ const ECOM_DETAIL: SpecificationDetail = {
 function buildPlaceholderDetail(item: SpecificationListItem): SpecificationDetail {
   return {
     id: item.id,
+    versionId: item.versionId,
     title: item.title,
     description: `Specification generated from template “${item.templateLabel}”.`,
     templateLabel: item.templateLabel,

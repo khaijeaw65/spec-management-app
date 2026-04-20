@@ -20,21 +20,24 @@ export function DashboardStats({
       label: "My specifications",
       value: total,
       icon: FileText,
-      iconWrap: "bg-blue-50 text-blue-600",
+      iconWrap:
+        "bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400",
     },
     {
       key: "reviewed",
       label: "Reviewed",
       value: reviewed,
       icon: CheckCircle,
-      iconWrap: "bg-green-50 text-green-600",
+      iconWrap:
+        "bg-green-50 text-green-600 dark:bg-green-950/50 dark:text-green-400",
     },
     {
       key: "processing",
       label: "Processing",
       value: processing,
       icon: Loader2,
-      iconWrap: "bg-blue-50 text-blue-600",
+      iconWrap:
+        "bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400",
       spin: processing > 0,
     },
     {
@@ -42,7 +45,8 @@ export function DashboardStats({
       label: "Failed",
       value: failed,
       icon: AlertCircle,
-      iconWrap: "bg-red-50 text-red-600",
+      iconWrap:
+        "bg-red-50 text-red-600 dark:bg-red-950/50 dark:text-red-400",
       emphasize: failed > 0,
     },
   ] as const;
@@ -52,16 +56,18 @@ export function DashboardStats({
       {cards.map((c) => (
         <Card.Root
           key={c.key}
-          className="border border-zinc-200 bg-white shadow-sm"
+          className="border border-zinc-200 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900"
         >
           <Card.Content className="flex items-center justify-between gap-3 p-4">
             <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0">
-              <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                 {c.label}
               </p>
               <p
                 className={`text-2xl font-semibold tabular-nums leading-none ${
-                  "emphasize" in c && c.emphasize ? "text-red-600" : "text-zinc-950"
+                  "emphasize" in c && c.emphasize
+                    ? "text-red-600 dark:text-red-400"
+                    : "text-zinc-950 dark:text-zinc-50"
                 }`}
               >
                 {c.value}

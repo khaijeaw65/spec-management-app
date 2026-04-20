@@ -11,10 +11,13 @@ export interface SpecificationMomFile {
   fileName: string;
   extension: MomFileExtension;
   /**
-   * URL for download and in-app preview. Demo: `/spec-mom-samples/...`;
-   * production: presigned S3 GET URL.
+   * Loads `GET /specs/:versionId/mom` with Bearer auth (API-backed detail).
    */
-  downloadUrl: string;
+  versionId?: string;
+  /**
+   * Static/demo asset URL when `versionId` is not used (e.g. `/spec-mom-samples/...`).
+   */
+  downloadUrl?: string;
 }
 
 export interface SpecDetailSection {
@@ -41,7 +44,10 @@ export interface SpecDetailVersion {
 }
 
 export interface SpecificationDetail {
+  /** Main spec id (status updates, route). */
   id: string;
+  /** Current generated-spec row id (PDF export). */
+  versionId: string;
   title: string;
   description: string;
   templateLabel: string;

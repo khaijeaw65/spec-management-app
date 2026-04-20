@@ -18,9 +18,12 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import {
   TemplateDetailSchema,
+  type CreateTemplateDto,
   type TemplateDetailDto,
+  type UpdateTemplateDto,
 } from "@spec-app/schemas";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Button,
   FieldError,
@@ -39,8 +42,12 @@ import { useRouter } from "next/navigation";
 import type { Control } from "react-hook-form";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
 
-import { delay } from "@/lib/mock-utils";
+import { templateQueryKeys } from "@/lib/template-query-keys";
 import { cn } from "@/lib/utils";
+import {
+  createTemplate,
+  updateTemplate,
+} from "@/services/template.service";
 
 type TemplateFormProps = {
   mode: "create" | "edit";
@@ -96,22 +103,23 @@ function SortableSectionRow({
       ref={setNodeRef}
       style={style}
       className={cn(
-        "rounded-xl border border-zinc-200 bg-white p-4 shadow-sm",
-        isDragging && "z-10 opacity-90 ring-2 ring-blue-200",
+        "rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-700 dark:bg-zinc-900",
+        isDragging &&
+          "z-10 opacity-90 ring-2 ring-blue-200 dark:ring-blue-800",
       )}
     >
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
         <div className="flex items-center gap-2 lg:flex-col lg:items-center">
           <button
             type="button"
-            className="flex size-9 cursor-grab touch-none items-center justify-center rounded-md text-zinc-400 active:cursor-grabbing hover:bg-zinc-100"
+            className="flex size-9 cursor-grab touch-none items-center justify-center rounded-md text-zinc-400 active:cursor-grabbing hover:bg-zinc-100 dark:hover:bg-zinc-800"
             aria-label="Reorder section"
             {...attributes}
             {...listeners}
           >
             <GripVertical className="size-5" />
           </button>
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-sm font-semibold text-zinc-700">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-sm font-semibold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
             {index + 1}
           </span>
         </div>
@@ -129,11 +137,11 @@ function SortableSectionRow({
                 onChange={field.onChange}
                 value={field.value}
               >
-                <Label.Root className="text-sm font-medium text-zinc-900">
+                <Label.Root className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
                   Section title
                 </Label.Root>
                 <Input.Root
-                  className="mt-1.5 border-zinc-200"
+                  className="mt-1.5 border-zinc-200 dark:border-zinc-700"
                   placeholder="Section title"
                 />
                 {fieldState.error ? (
@@ -156,11 +164,11 @@ function SortableSectionRow({
                 onChange={field.onChange}
                 value={field.value}
               >
-                <Label.Root className="text-sm font-medium text-zinc-900">
+                <Label.Root className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
                   Description
                 </Label.Root>
                 <TextArea.Root
-                  className="mt-1.5 min-h-[100px] border-zinc-200"
+                  className="mt-1.5 min-h-[100px] border-zinc-200 dark:border-zinc-700"
                   placeholder="Describe what AI should extract for this section — used as guidance for AI generation"
                   rows={4}
                 />
@@ -198,6 +206,7 @@ export function TemplateForm({
   defaultValues,
 }: Readonly<TemplateFormProps>) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const isEdit = mode === "edit";
 
   const {
@@ -230,10 +239,40 @@ export function TemplateForm({
     move(oldIndex, newIndex);
   };
 
-  const onSubmit = handleSubmit(async () => {
-    await delay(300);
-    toast.success("Template saved.");
-    router.push("/templates");
+  const onSubmit = handleSubmit(async (values) => {
+    const sections = values.sections.map((s, index) => ({
+      id: s.id,
+      title: s.title,
+      description: s.description,
+      order: index,
+    }));
+
+    try {
+      if (isEdit) {
+        const body: UpdateTemplateDto = {
+          id: values.id,
+          versionId: values.versionId,
+          name: values.name,
+          description: values.description,
+          language: values.language,
+          sections,
+        };
+        await updateTemplate(values.id, body);
+      } else {
+        const body: CreateTemplateDto = {
+          name: values.name,
+          description: values.description,
+          language: values.language,
+          sections,
+        };
+        await createTemplate(body);
+      }
+      await queryClient.invalidateQueries({ queryKey: templateQueryKeys.all });
+      toast.success("Template saved.");
+      router.push("/templates");
+    } catch {
+      toast.danger("Could not save template. Try again.");
+    }
   });
 
   const languageBlock = (
@@ -248,19 +287,19 @@ export function TemplateForm({
           className="flex flex-col gap-2"
         >
           <div className="flex flex-wrap gap-6">
-            <Radio.Root value="en" className="flex items-center gap-2">
+            <Radio.Root value="EN" className="flex items-center gap-2">
               <Radio.Control>
                 <Radio.Indicator />
               </Radio.Control>
-              <Radio.Content className="text-sm text-zinc-800">
+              <Radio.Content className="text-sm text-zinc-800 dark:text-zinc-200">
                 English
               </Radio.Content>
             </Radio.Root>
-            <Radio.Root value="th" className="flex items-center gap-2">
+            <Radio.Root value="TH" className="flex items-center gap-2">
               <Radio.Control>
                 <Radio.Indicator />
               </Radio.Control>
-              <Radio.Content className="text-sm text-zinc-800">
+              <Radio.Content className="text-sm text-zinc-800 dark:text-zinc-200">
                 Thai (ไทย)
               </Radio.Content>
             </Radio.Root>
@@ -272,16 +311,16 @@ export function TemplateForm({
 
   return (
     <div className="min-h-screen">
-      <div className="border-b border-zinc-200 bg-white px-6 py-5">
+      <div className="border-b border-zinc-200 bg-white px-6 py-5 dark:border-zinc-800 dark:bg-zinc-900">
         <div className="mx-auto max-w-3xl">
           <Link
             href="/templates"
-            className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-700"
+            className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
           >
             <ArrowLeft className="size-4" aria-hidden />
             Back to Templates
           </Link>
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-950">
+          <h1 className="text-2xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
             {isEdit ? "Edit Template" : "Create Template"}
           </h1>
         </div>
@@ -289,8 +328,8 @@ export function TemplateForm({
 
       <div className="mx-auto max-w-3xl p-6">
         <form className="space-y-8" onSubmit={onSubmit} noValidate>
-          <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
-            <h2 className="text-sm font-semibold text-zinc-900">
+          <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
+            <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
               Template details
             </h2>
             <div className="mt-4 space-y-6">
@@ -306,11 +345,11 @@ export function TemplateForm({
                     onChange={field.onChange}
                     value={field.value}
                   >
-                    <Label.Root className="text-sm font-medium text-zinc-900">
+                    <Label.Root className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
                       Template Name
                     </Label.Root>
                     <Input.Root
-                      className="mt-1.5 border-zinc-200"
+                      className="mt-1.5 border-zinc-200 dark:border-zinc-700"
                       placeholder="e.g. Standard Template"
                     />
                     {fieldState.error ? (
@@ -323,7 +362,7 @@ export function TemplateForm({
               />
 
               <div>
-                <Label.Root className="text-sm font-medium text-zinc-900">
+                <Label.Root className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
                   Language
                 </Label.Root>
                 <div className="mt-2">
@@ -354,11 +393,11 @@ export function TemplateForm({
                     onChange={field.onChange}
                     value={field.value}
                   >
-                    <Label.Root className="text-sm font-medium text-zinc-900">
+                    <Label.Root className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
                       Template description
                     </Label.Root>
                     <TextArea.Root
-                      className="mt-1.5 min-h-[110px] border-zinc-200"
+                      className="mt-1.5 min-h-[110px] border-zinc-200 dark:border-zinc-700"
                       placeholder="Optional description to help teammates understand the purpose of this template"
                       rows={4}
                     />
@@ -374,9 +413,11 @@ export function TemplateForm({
           </div>
 
           <div className="space-y-4">
-            <h2 className="text-sm font-semibold text-zinc-900">Sections</h2>
+            <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+              Sections
+            </h2>
             {errors.sections?.message ? (
-              <p className="text-sm text-red-600" role="alert">
+              <p className="text-sm text-red-600 dark:text-red-400" role="alert">
                 {errors.sections.message}
               </p>
             ) : null}
@@ -409,7 +450,7 @@ export function TemplateForm({
               variant="outline"
               className="border-dashed"
               onPress={() =>
-                append({ title: "", description: "", order: fields.length + 1 })
+                append({ title: "", description: "", order: fields.length })
               }
             >
               <Plus className="size-4" aria-hidden />
@@ -417,7 +458,7 @@ export function TemplateForm({
             </Button>
           </div>
 
-          <div className="flex flex-wrap justify-end gap-3 border-t border-zinc-200 pt-6">
+          <div className="flex flex-wrap justify-end gap-3 border-t border-zinc-200 pt-6 dark:border-zinc-800">
             <Button
               type="button"
               variant="outline"

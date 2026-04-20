@@ -1,11 +1,16 @@
-import type { TemplateFormDto } from "@spec-app/schemas";
+import { randomUUID } from "crypto";
+
+import type { TemplateDetailDto } from "@spec-app/schemas";
 
 import { TemplateForm } from "@/components/templates/template-form";
 
-const CREATE_DEFAULTS: TemplateFormDto = {
+const CREATE_DEFAULTS: TemplateDetailDto = {
+  id: randomUUID(),
+  versionId: randomUUID(),
   name: "",
-  language: "en",
-  sections: [{ title: "", description: "" }],
+  description: "",
+  language: "EN",
+  sections: [{ title: "", description: "", order: 0 }],
 };
 
 export default function CreateTemplatePage() {

@@ -21,7 +21,7 @@ function RelativeTime({ iso }: Readonly<{ iso: string }>) {
   }, [iso]);
 
   return (
-    <span className="tabular-nums text-zinc-500">
+    <span className="tabular-nums text-zinc-500 dark:text-zinc-400">
       {label ?? "…"}
     </span>
   );
@@ -33,27 +33,29 @@ export function DashboardRecentActivity({
   return (
     <section className="space-y-3">
       <div>
-        <h2 className="text-sm font-semibold text-zinc-900">Recent activity</h2>
-        <p className="text-xs text-zinc-500">
+        <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+          Recent activity
+        </h2>
+        <p className="text-xs text-zinc-500 dark:text-zinc-400">
           Latest updates across your specifications (demo data).
         </p>
       </div>
-      <Card.Root className="border border-zinc-200 bg-white shadow-sm">
-        <Card.Content className="divide-y divide-zinc-100 p-0">
+      <Card.Root className="border border-zinc-200 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
+        <Card.Content className="divide-y divide-zinc-100 p-0 dark:divide-zinc-800">
           {items.map((spec) => (
             <Link
               key={spec.id}
-              href={`/specifications/${spec.id}`}
-              className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-zinc-50"
+              href={`/specifications/${spec.id}/${spec.versionId}`}
+              className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/60"
             >
-              <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-zinc-600">
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
                 <FileText className="size-4" aria-hidden />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-zinc-950">
+                <p className="truncate text-sm font-medium text-zinc-950 dark:text-zinc-50">
                   {spec.title}
                 </p>
-                <p className="truncate text-xs text-zinc-500">
+                <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">
                   {spec.templateLabel} · v{spec.version}
                 </p>
               </div>
@@ -61,7 +63,7 @@ export function DashboardRecentActivity({
                 <RelativeTime iso={spec.updatedAt} />
                 <SpecStatusBadge status={spec.status} />
                 <ArrowRight
-                  className="size-4 text-zinc-300"
+                  className="size-4 text-zinc-300 dark:text-zinc-600"
                   aria-hidden
                 />
               </div>

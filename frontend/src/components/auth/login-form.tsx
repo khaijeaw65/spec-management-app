@@ -11,13 +11,11 @@ import {
   TextField,
 } from "@heroui/react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
 import { Controller, useForm } from "react-hook-form";
 
-import { login } from "@/services/auth.service";
+import { signIn } from 'next-auth/react';
 
 export function LoginForm() {
-  const router = useRouter();
   const {
     control,
     handleSubmit,
@@ -28,12 +26,20 @@ export function LoginForm() {
   });
 
   const onSubmit = handleSubmit(async (data) => {
-    await login(data);
-    router.push("/dashboard");
+    try {
+      await signIn("credentials", {
+      email: data.email,
+      password: data.password,
+      redirect: true,
+      callbackUrl: "/dashboard",
+    });
+    } catch (error) {
+      alert(error);
+    }
+    
   });
-
   return (
-    <Card.Root className="w-full max-w-md border border-zinc-200 bg-white shadow-sm">
+    <Card.Root className="w-full max-w-md border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
       <Card.Header className="flex flex-col items-center gap-4 pb-2 pt-8 text-center">
         <div className="flex size-14 items-center justify-center rounded-xl bg-blue-600 p-2.5 shadow-sm">
           <Image
@@ -46,10 +52,10 @@ export function LoginForm() {
           />
         </div>
         <div className="space-y-1">
-          <Card.Title className="text-2xl font-semibold tracking-tight text-zinc-950">
+          <Card.Title className="text-2xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
             SpecBuilder
           </Card.Title>
-          <Card.Description className="text-sm text-zinc-500">
+          <Card.Description className="text-sm text-zinc-500 dark:text-zinc-400">
             Please enter your credentials to access the application
           </Card.Description>
         </div>
@@ -68,12 +74,12 @@ export function LoginForm() {
                 onChange={field.onChange}
                 value={field.value}
               >
-                <Label.Root className="text-sm font-medium text-zinc-900">
+                <Label.Root className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
                   Email
                 </Label.Root>
                 <Input.Root
                   autoComplete="email"
-                  className="mt-1.5 border-zinc-200"
+                  className="mt-1.5 border-zinc-200 dark:border-zinc-700"
                   placeholder="name@company.com"
                   type="email"
                 />
@@ -97,12 +103,12 @@ export function LoginForm() {
                 onChange={field.onChange}
                 value={field.value}
               >
-                <Label.Root className="text-sm font-medium text-zinc-900">
+                <Label.Root className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
                   Password
                 </Label.Root>
                 <Input.Root
                   autoComplete="current-password"
-                  className="mt-1.5 border-zinc-200"
+                  className="mt-1.5 border-zinc-200 dark:border-zinc-700"
                   type="password"
                 />
                 {fieldState.error ? (

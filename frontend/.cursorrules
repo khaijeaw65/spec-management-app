@@ -21,6 +21,8 @@ Not a chat AI — AI is only called in controlled workflow steps.
 - Validation:    Zod schemas from @spec-app/schemas ONLY — never write schemas here
 - Icons:         lucide-react
 - DnD:           @dnd-kit/core + @dnd-kit/sortable (template section reordering)
+- Data fetching: TanStack React Query v5 + axios
+- HTTP client:   axios with global instance from src/lib/axios.ts
 
 ---
 
@@ -45,6 +47,92 @@ spec-app/
 ```
 Always import types and schemas from `@spec-app/schemas`.
 Never duplicate types that already exist as inferred types from those schemas.
+
+---
+
+## Axios Setup
+Global axios instance in `src/lib/axios.ts`:
+```typescript
+import axios from 'axios';
+
+const api = axios.create({
+  baseURL: process.env.NEXT_PUBLIC_API_URL,
+  headers: { 'Content-Type': 'application/json' },
+});
+
+// attach JWT token from localStorage on every request
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('access_token');
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
+// handle 401 globally — redirect to login
+api.interceptors.response.use(
+  (res) => res,
+  (error) => {
+    if (error.response?.status === 401) {
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
+
+export default api;
+```
+
+Always import `api` from `src/lib/axios.ts` — never use raw `axios` directly in services.
+
+## React Query Setup
+QueryClient in `src/lib/query-client.ts`:
+```typescript
+import { QueryClient } from '@tanstack/react-query';
+
+export const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 30,   // 30 seconds
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
+```
+
+Wrap app in QueryClientProvider in `src/app/providers.tsx` (client component).
+
+## Service Pattern (after demo wiring)
+Services use axios and return typed data — React Query handles caching:
+```typescript
+// src/services/spec.service.ts
+import api from '@/lib/axios';
+import type { SpecDto } from '@spec-app/schemas';
+
+export const specService = {
+  getList: async (): Promise<SpecDto[]> => {
+    const res = await api.get('/specs');
+    return res.data.data;
+  },
+
+  getById: async (id: string): Promise<SpecDto> => {
+    const res = await api.get(`/specs/${id}`);
+    return res.data.data;
+  },
+};
+```
+
+## Polling with React Query
+Use `refetchInterval` for PENDING/PROCESSING specs:
+```typescript
+useQuery({
+  queryKey: ['spec', id],
+  queryFn: () => specService.getById(id),
+  refetchInterval: (query) => {
+    const status = query.state.data?.status;
+    return status === 'PENDING' || status === 'PROCESSING' ? 4000 : false;
+  },
+});
+```
 
 ---
 
@@ -94,6 +182,7 @@ src/
         [id]/
           edit/
             page.tsx
+    providers.tsx             ← QueryClientProvider + HeroUIProvider wrapper
   components/
     layout/
       sidebar.tsx
@@ -112,6 +201,8 @@ src/
   types/
     api.types.ts
   lib/
+    axios.ts                  ← global axios instance
+    query-client.ts           ← QueryClient config
     mock-utils.ts
     utils.ts
 ```
@@ -127,6 +218,28 @@ src/
 
 ---
 
+## Dark Mode
+- Supported via HeroUI + Tailwind CSS v4
+- Toggle lives in sidebar bottom section
+- Use HeroUI's `useTheme` hook to toggle between light/dark
+- Persist preference in localStorage key: `theme`
+- Default: system preference via `prefers-color-scheme`
+- Apply `dark` class on `<html>` element
+- All components must support both light and dark — use Tailwind dark: variants
+- Never hardcode light-only colors — always pair with dark: equivalent
+
+### Dark Mode Color Mapping
+```
+Light                          Dark
+zinc-50  (content bg)     →   zinc-950
+white    (card bg)         →   zinc-900
+zinc-200 (border)          →   zinc-700
+zinc-900 (sidebar)         →   zinc-950  (slightly darker)
+zinc-800 (sidebar active)  →   zinc-800  (same)
+```
+
+---
+
 ## Design System
 
 ### Overall Feel
@@ -134,11 +247,12 @@ src/
 - Compact density — tighter spacing, less padding than typical marketing designs
 - Strong typographic hierarchy
 - Functional over decorative — reduce icons and decorative elements
+- Supports light and dark mode
 
 ### Layout
-- Sidebar: fixed left, 240px wide, dark (`zinc-900`)
-- Content area: fills remaining width, light background (`zinc-50`)
-- Topbar: inside content area, white bg, border-bottom, 64px tall
+- Sidebar: fixed left, 240px wide, dark (`zinc-900` light / `zinc-950` dark)
+- Content area: fills remaining width, `zinc-50` light / `zinc-950` dark
+- Topbar: inside content area, white/zinc-900 bg, border-bottom, 64px tall
 - Page content: padded container, 24px padding
 
 ### Sidebar Structure
@@ -152,7 +266,7 @@ Navigation:
   - Templates         (Layout icon)
 
 Bottom:
-  - Theme toggle
+  - Theme toggle      (Sun/Moon icon)
   - User avatar + name
   - Logout button
 ```
@@ -163,12 +277,12 @@ Sidebar item states:
 - Hover:    zinc-700 bg
 
 ### Color Palette
-- Sidebar bg:        zinc-900
+- Sidebar bg:        zinc-900 / dark:zinc-950
 - Sidebar text:      zinc-400 (inactive), white (active)
 - Sidebar active:    zinc-800
-- Content bg:        zinc-50
-- Card bg:           white
-- Border:            zinc-200
+- Content bg:        zinc-50 / dark:zinc-950
+- Card bg:           white / dark:zinc-900
+- Border:            zinc-200 / dark:zinc-700
 - Primary:           blue-600
 - Danger:            red-500
 - Success:           green-600
@@ -176,11 +290,19 @@ Sidebar item states:
 - Processing:        blue-500
 
 ### Status Badge Colors
+- PENDING     → gray badge + Clock icon
 - PROCESSING  → blue badge + animated Loader2 spinner icon
 - COMPLETED   → green badge
 - REVIEWED    → green badge + CheckCircle icon
 - FAILED      → red badge + AlertCircle icon
-- EXPORTED    → purple badge + Download icon
+
+NOTE: There is NO EXPORTED status — export is tracked by exportedOn timestamp only.
+A spec can be exported regardless of its current status (COMPLETED or REVIEWED).
+
+### Risk Priority Badge Colors
+- HIGH    → red badge
+- MEDIUM  → amber badge
+- LOW     → green badge
 
 ---
 
@@ -196,13 +318,14 @@ export function mockResponse<T>(data: T, status = 200): ApiResponse<T> {
 ---
 
 ## Mock Data Scale
-- 5-6 mock specs with mixed statuses: PROCESSING, COMPLETED, REVIEWED, FAILED, EXPORTED
+- 5-6 mock specs with mixed statuses: PENDING, PROCESSING, COMPLETED, REVIEWED, FAILED
+  NOTE: No EXPORTED status in mock data
 - 4 mock templates: Standard Template, Mobile App Template, API Template, UI/UX Template
   - Mix of English and Thai — at least 1 Thai template
   - Each with realistic section titles and descriptions
 - 1 spec with 3 versions (demo version history tab)
 - 1 spec with 3-4 risks (demo ambiguities tab)
-  - Each risk must include: priority, type, related section name, title, MOM quote
+  - Each risk must include: priority (HIGH|MEDIUM|LOW), type, related section name, detail, referenceText (MOM quote)
 - Realistic names, dates, content — not placeholder text
 
 ---
@@ -264,19 +387,20 @@ DO NOT include:
 Each spec row:
 - Document icon
 - Title (bold) + subtitle: "[Template] • v[N] • [N] sections"
+- Description (muted, if exists)
 - Language badge
-- Status badge (with spinner for PROCESSING)
+- Status badge (with spinner for PENDING and PROCESSING)
 - Date
 - ⋮ menu:
   - View → /specifications/[id]
   - Regenerate (confirmation modal)
-  - Mark as Reviewed (only if not already REVIEWED)
+  - Mark as Reviewed (only if COMPLETED, not already REVIEWED)
 
-PROCESSING behavior:
-- Badge shows spinner
+PENDING + PROCESSING behavior:
+- Both badges show spinner
 - Poll every 4 seconds (mock: useEffect interval)
 - On COMPLETED: show toast "✓ [name] is ready to review"
-- Clear interval when no longer PROCESSING
+- Clear interval when status is no longer PENDING or PROCESSING
 
 Empty state:
 - Icon + "No specifications yet"
@@ -315,6 +439,8 @@ Two input methods (tabs or toggle):
 
 **Step 2 — Select Template & Language:**
 - Card title: "Select Template & Language"
+- Spec name input: required, placeholder "e.g. Payment Gateway Integration"
+- Spec description input: optional, placeholder "Brief description of this specification"
 - Template grid (2×2): Standard, Mobile App, API, UI/UX
   - Each card: name, short description, section count
   - Selected state: blue border + blue check badge
@@ -324,7 +450,7 @@ Two input methods (tabs or toggle):
 - Buttons: "← Back" | "Generate Specification →"
 
 **On submit:**
-- Create mock spec status: PROCESSING
+- Create mock spec status: PENDING → then PROCESSING
 - Redirect immediately to /specifications
 - Spec at top of list with PROCESSING badge + spinner
 - After 5 seconds: status → COMPLETED
@@ -336,12 +462,12 @@ Two input methods (tabs or toggle):
 
 **Header:**
 - "← Back to Specifications"
-- Title (large bold) + subtitle (muted)
+- Title (large bold) + description (muted, if exists)
 - Badges: Status + Language + Version (e.g. "v2")
-- Right: ⋮ menu + "Export PDF" button (blue)
+- Right: ⋮ menu + "Export PDF" button (blue, enabled only for COMPLETED or REVIEWED)
 
 **⋮ menu:**
-- Mark as Reviewed (only if not REVIEWED)
+- Mark as Reviewed (only if COMPLETED, not already REVIEWED)
   - Confirmation modal:
     "Marking as reviewed indicates this spec has been checked —
     not that it is final or approved. Continue?"
@@ -358,9 +484,11 @@ Two input methods (tabs or toggle):
 - Buttons: Cancel | Confirm
 
 **Export PDF:**
+- Enabled only when status is COMPLETED or REVIEWED
 - On click: toast "Exporting PDF..."
 - After 1 second: toast "PDF exported successfully"
 - No actual file generation for demo
+- No status change on export — exportedOn is tracked server-side only
 
 **Metadata row (card):**
 - Template | Created By | Created Date | Last Modified
@@ -379,12 +507,12 @@ Tab 1 — Specification:
 
 Tab 2 — Ambiguities & Risks:
 - Summary: "Found X potential ambiguities or risks. Please review and clarify."
-- Each risk card (FR-RISK-02):
-  - Priority badge: High (red) | Medium (amber) | Low (green)
-  - Type badge: e.g. "Ambiguous word", "Unclear scope", "Missing timeline"
-  - Related section name (muted, e.g. "→ User Requirements")
-  - Risk title (bold)
-  - MOM reference quote (italic muted, in quotation marks)
+- Each risk card:
+  - Priority badge: High (red) | Medium (amber) | Low (green)  ← AI-determined
+  - Type badge: e.g. "Ambiguous Language", "Unclear Scope", "Missing Timeline"
+  - Related section name (muted, e.g. "→ User Requirements") — null if spec-level risk
+  - Detail text (bold)
+  - MOM reference quote (italic muted, in quotation marks) — if referenceText exists
 - NO "Mark as Resolved" button
 - NO "Add Note" button
 - Empty state: green CheckCircle + "No ambiguities or risks detected"
@@ -398,9 +526,10 @@ Tab 3 — Versions:
 - NO "Restore" button
 
 **Page states:**
+- PENDING:    HeroUI Skeleton + banner "Your specification is queued for generation..."
 - PROCESSING: HeroUI Skeleton + banner "Your specification is being generated..."
-- FAILED: red banner "Generation failed. Please try regenerating." + Regenerate button
-- COMPLETED / REVIEWED / EXPORTED: full content
+- FAILED:     red banner "Generation failed. Please try regenerating." + Regenerate button
+- COMPLETED / REVIEWED: full content
 
 ---
 
@@ -464,12 +593,13 @@ Same component, two modes.
 
 ## Component Rules
 - Server components by default
-- `'use client'` only for: forms, interactive state, polling, DnD
+- `'use client'` only for: forms, interactive state, polling, DnD, theme toggle
 - Forms: react-hook-form + zodResolver always
 - Never write inline Zod schemas — import from @spec-app/schemas
 - Never use `any`
 - Use `import type` for type-only imports in decorated contexts
 - Do NOT manually add useMemo/useCallback — React Compiler handles this
+- Always support both light and dark variants on every component
 
 ---
 
@@ -484,14 +614,17 @@ Every data page must handle:
 ## State Management
 - Local useState for all UI state
 - No global store needed for demo
-- Polling: useEffect + setInterval, always clear on unmount or status change
+- Polling: useEffect + setInterval for demo, React Query refetchInterval after wiring
+- Poll for both PENDING and PROCESSING statuses
 - Toast: HeroUI addToast
+- Theme: localStorage key `theme`, applied as `dark` class on `<html>`
 
 ---
 
 ## What NOT To Do
 - Do not write Zod schemas — always import from @spec-app/schemas
-- Do not make real API calls — use mock functions only
+- Do not make real API calls — use mock functions only (until after demo)
+- Do not use raw axios — always use the global api instance from src/lib/axios.ts
 - Do not add authentication logic — hardcoded redirect for demo
 - Do not use pages/ router — App Router only
 - Do not use `any` in TypeScript
@@ -509,3 +642,8 @@ Every data page must handle:
 - Do not allow language change on template edit mode
 - Do not allow deleting the last remaining section of a template
 - Do not extract text from uploaded files on frontend — backend handles extraction
+- Do not add EXPORTED as a status badge — no such status exists
+- Do not disable Export PDF button based on exported status — use COMPLETED/REVIEWED check only
+- Do not show spec description as empty string — only show if it exists
+- Do not hardcode light-only colors — always pair with dark: variant
+- Do not use NEXT_PUBLIC_ env vars for sensitive data — baseURL only

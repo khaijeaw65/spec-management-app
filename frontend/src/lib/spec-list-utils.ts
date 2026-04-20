@@ -50,7 +50,7 @@ export function formatListDate(iso: string): string {
 }
 
 export function languageLabel(lang: SpecLanguage): string {
-  return lang === "th" ? "ไทย" : "English";
+  return lang === "TH" ? "ไทย" : "English";
 }
 
 export function filterAndSortSpecifications(

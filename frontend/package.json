@@ -16,6 +16,8 @@
     "@heroui/react": "^3.0.2",
     "@hookform/resolvers": "^5.2.2",
     "@spec-app/schemas": "file:../packages/schemas",
+    "@tanstack/react-query": "^5.99.2",
+    "axios": "^1.15.1",
     "framer-motion": "^12.38.0",
     "lucide-react": "^1.7.0",
     "mammoth": "^1.11.0",

@@ -32,7 +32,9 @@ export function FilterComboBox({
           if (key !== null) onSelect(String(key));
         }}
       >
-        <Label className="text-xs font-medium text-zinc-700">{label}</Label>
+        <Label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+          {label}
+        </Label>
         <ComboBox.InputGroup className="w-full min-w-0">
           <Input placeholder={placeholder} />
           <ComboBox.Trigger

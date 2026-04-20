@@ -2,13 +2,15 @@
 
 import { useEffect, useState } from "react";
 
+import { fetchSpecMom } from "@/services/spec.service";
 import type { SpecificationMomFile } from "@/types/spec-detail.types";
 
 export type MomPreviewState =
   | { status: "idle" | "loading" }
   | { status: "error"; message: string }
   | { status: "txt"; text: string }
-  | { status: "docx-html"; html: string };
+  | { status: "docx-html"; html: string }
+  | { status: "pdf"; url: string };
 
 async function fetchTxtPreview(url: string): Promise<string> {
   const res = await fetch(url);
@@ -40,48 +42,90 @@ export function useMomPreview(mom: SpecificationMomFile): MomPreviewState {
   const [preview, setPreview] = useState<MomPreviewState>({ status: "idle" });
 
   useEffect(() => {
-    if (mom.extension === "pdf") {
-      return;
-    }
-
     let cancelled = false;
+    let pdfObjectUrl: string | undefined;
 
-    queueMicrotask(() => {
-      if (cancelled) return;
-      setPreview({ status: "loading" });
+    const run = async () => {
+      const hasApi = Boolean(mom.versionId);
+      const hasStatic = Boolean(mom.downloadUrl);
+      if (!hasApi && !hasStatic) {
+        setPreview({
+          status: "error",
+          message: "No file source configured.",
+        });
+        return;
+      }
 
-      const run = async () => {
+      if (mom.extension === "pdf") {
+        setPreview({ status: "loading" });
         try {
-          if (mom.extension === "txt") {
-            const text = await fetchTxtPreview(mom.downloadUrl);
-            if (!cancelled) setPreview({ status: "txt", text });
+          if (mom.versionId) {
+            const blob = await fetchSpecMom(mom.versionId);
+            if (cancelled) return;
+            pdfObjectUrl = URL.createObjectURL(blob);
+            setPreview({ status: "pdf", url: pdfObjectUrl });
             return;
           }
-          const html = await fetchDocxAsHtml(mom.downloadUrl);
-          if (!cancelled) setPreview({ status: "docx-html", html });
+          if (mom.downloadUrl) {
+            setPreview({ status: "pdf", url: mom.downloadUrl });
+          }
         } catch {
           if (!cancelled) {
             setPreview({
               status: "error",
-              message: previewErrorMessage(
-                mom.extension === "docx" ? "docx" : "txt",
-              ),
+              message:
+                "Could not load PDF preview. Try downloading the file.",
             });
           }
         }
-      };
+        return;
+      }
 
-      void run();
-    });
+      setPreview({ status: "loading" });
+
+      try {
+        if (mom.extension === "txt") {
+          let text: string;
+          if (mom.versionId) {
+            const blob = await fetchSpecMom(mom.versionId);
+            text = await blob.text();
+          } else {
+            text = await fetchTxtPreview(mom.downloadUrl!);
+          }
+          if (!cancelled) setPreview({ status: "txt", text });
+          return;
+        }
+
+        let html: string;
+        if (mom.versionId) {
+          const blob = await fetchSpecMom(mom.versionId);
+          const buf = await blob.arrayBuffer();
+          const { convertToHtml } = await import("mammoth");
+          const { value } = await convertToHtml({ arrayBuffer: buf });
+          html = value;
+        } else {
+          html = await fetchDocxAsHtml(mom.downloadUrl!);
+        }
+        if (!cancelled) setPreview({ status: "docx-html", html });
+      } catch {
+        if (!cancelled) {
+          setPreview({
+            status: "error",
+            message: previewErrorMessage(
+              mom.extension === "docx" ? "docx" : "txt",
+            ),
+          });
+        }
+      }
+    };
+
+    void run();
 
     return () => {
       cancelled = true;
+      if (pdfObjectUrl) URL.revokeObjectURL(pdfObjectUrl);
     };
-  }, [mom.downloadUrl, mom.extension]);
-
-  if (mom.extension === "pdf") {
-    return { status: "idle" };
-  }
+  }, [mom.versionId, mom.downloadUrl, mom.extension]);
 
   return preview;
 }

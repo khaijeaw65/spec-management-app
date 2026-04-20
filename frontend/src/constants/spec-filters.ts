@@ -7,17 +7,17 @@ import type {
 
 export const STATUS_FILTER_OPTIONS: SpecFilterOption<SpecStatusFilter>[] = [
   { id: "all", label: "All Status" },
+  { id: "PENDING", label: "PENDING" },
   { id: "PROCESSING", label: "PROCESSING" },
   { id: "COMPLETED", label: "COMPLETED" },
   { id: "REVIEWED", label: "REVIEWED" },
   { id: "FAILED", label: "FAILED" },
-  { id: "EXPORTED", label: "EXPORTED" },
 ];
 
 export const LANGUAGE_FILTER_OPTIONS: SpecFilterOption<SpecLangFilter>[] = [
   { id: "all", label: "All Languages" },
-  { id: "en", label: "English" },
-  { id: "th", label: "Thai (ไทย)" },
+  { id: "EN", label: "English" },
+  { id: "TH", label: "Thai (ไทย)" },
 ];
 
 export const SORT_OPTIONS: SpecFilterOption<SpecSortKey>[] = [

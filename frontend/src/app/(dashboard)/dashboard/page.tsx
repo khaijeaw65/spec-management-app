@@ -31,13 +31,13 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen">
-      <div className="border-b border-zinc-200 bg-white px-6 py-5">
+      <div className="border-b border-zinc-200 bg-white px-6 py-5 dark:border-zinc-800 dark:bg-zinc-900">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-zinc-950">
+            <h1 className="text-2xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50">
               Specification Management
             </h1>
-            <p className="mt-1 max-w-2xl text-sm text-zinc-600">
+            <p className="mt-1 max-w-2xl text-sm text-zinc-600 dark:text-zinc-400">
               Transform meeting notes into structured, unambiguous project
               specifications — AI runs only in controlled workflow steps, not as
               a chat.

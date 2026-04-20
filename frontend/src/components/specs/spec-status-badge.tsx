@@ -1,7 +1,6 @@
 import {
   AlertCircle,
   CheckCircle,
-  Download,
   Loader2,
 } from "lucide-react";
 
@@ -18,12 +17,24 @@ const base =
 
 export function SpecStatusBadge({ status, className }: Readonly<SpecStatusBadgeProps>) {
   switch (status) {
+    case "PENDING":
+      return (
+        <span
+          className={cn(
+            base,
+            "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
+            className,
+          )}
+        >
+          PENDING
+        </span>
+      );
     case "PROCESSING":
       return (
         <span
           className={cn(
             base,
-            "bg-blue-100 text-blue-700",
+            "bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300",
             className,
           )}
         >
@@ -33,29 +44,40 @@ export function SpecStatusBadge({ status, className }: Readonly<SpecStatusBadgeP
       );
     case "COMPLETED":
       return (
-        <span className={cn(base, "bg-green-100 text-green-800", className)}>
+        <span
+          className={cn(
+            base,
+            "bg-green-100 text-green-800 dark:bg-green-950/60 dark:text-green-300",
+            className,
+          )}
+        >
           COMPLETED
         </span>
       );
     case "REVIEWED":
       return (
-        <span className={cn(base, "bg-green-100 text-green-800", className)}>
+        <span
+          className={cn(
+            base,
+            "bg-green-100 text-green-800 dark:bg-green-950/60 dark:text-green-300",
+            className,
+          )}
+        >
           <CheckCircle aria-hidden className="size-3.5" />
           REVIEWED
         </span>
       );
     case "FAILED":
       return (
-        <span className={cn(base, "bg-red-100 text-red-800", className)}>
+        <span
+          className={cn(
+            base,
+            "bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-300",
+            className,
+          )}
+        >
           <AlertCircle aria-hidden className="size-3.5" />
           FAILED
-        </span>
-      );
-    case "EXPORTED":
-      return (
-        <span className={cn(base, "bg-purple-100 text-purple-800", className)}>
-          <Download aria-hidden className="size-3.5" />
-          EXPORTED
         </span>
       );
     default: {
