@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { LanguageSchema } from "./template.schema";
+import { LanguageCodeSchema } from "./language.schema";
+import { SpecStatusCodeSchema } from "./spec-status.schema";
 
 /** Step 1 — meeting notes (paste or file). Matches create wizard `inputMethod`. */
 export const CreateSpecStep1Schema = z.discriminatedUnion("inputMethod", [
@@ -21,7 +22,7 @@ export type CreateSpecStep1Dto = z.infer<typeof CreateSpecStep1Schema>;
 /** Step 2 — template, language, spec name, optional description (maps to `main_generated_spec`). */
 export const CreateSpecStep2Schema = z.object({
   templateId: z.string().min(1, { message: "Select a template." }),
-  language: LanguageSchema,
+  language: z.string(),
   name: z
     .string()
     .trim()
@@ -52,10 +53,25 @@ export const CreateSpecSchema = z.object({
   inputType: z.enum(["TEXT", "FILE"]),
   mainTemplateId: z.uuid(),
   versionId: z.uuid(),
-  language: LanguageSchema,
+  language: LanguageCodeSchema,
 });
 
 export type CreateSpecDto = z.infer<typeof CreateSpecSchema>;
+
+/** Returned after `POST /specs/generate` (main spec id + current generated version id). */
+export const GenerateSpecResponseSchema = z.object({
+  id: z.uuid(),
+  versionId: z.uuid(),
+});
+
+export type GenerateSpecResponseDto = z.infer<typeof GenerateSpecResponseSchema>;
+
+/** `PATCH /specs/:id/status` — `id` is main spec id; status applies to the current version row. */
+export const UpdateSpecStatusSchema = z.object({
+  status: SpecStatusCodeSchema,
+});
+
+export type UpdateSpecStatusDto = z.infer<typeof UpdateSpecStatusSchema>;
 
 export const SpecSortSchema = z.enum([
   "NEWEST",
@@ -64,19 +80,13 @@ export const SpecSortSchema = z.enum([
   "TITLE_DESC",
 ]);
 
-export const SpecStatusSchema = z.enum([
-  "PENDING",
-  "PROCESSING",
-  "COMPLETED",
-  "FAILED",
-  "REVIEWED",
-]);
-
 export const SpecListQuerySchema = z.object({
   search: z.string().optional(),
-  status: SpecStatusSchema.optional(),
-  language: LanguageSchema.optional(),
+  status: SpecStatusCodeSchema.optional(),
+  language: LanguageCodeSchema.optional(),
   sort: SpecSortSchema.optional(),
+  page: z.coerce.number().int().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
 });
 
 export type SpecListQuery = z.infer<typeof SpecListQuerySchema>;
@@ -89,7 +99,7 @@ export const SpecSchema = z.object({
   version: z.number(),
   sectionCount: z.number(),
   language: z.string(),
-  status: SpecStatusSchema,
+  status: SpecStatusCodeSchema,
   updatedAt: z.string(),
 });
 
@@ -97,9 +107,9 @@ export type SpecDto = z.infer<typeof SpecSchema>;
 
 export const SpecListResponseSchema = z.object({
   items: z.array(SpecSchema),
-  total: z.number(),
-  page: z.number(),
-  pageSize: z.number(),
+  totalCount: z.number(),
+  page: z.number().int().min(1),
+  limit: z.number().int().min(1),
 });
 
 export type SpecListResponseDto = z.infer<typeof SpecListResponseSchema>;
@@ -119,11 +129,13 @@ export const RiskTypeSchema = z.enum([
   "UNCLEAR_SCOPE",
 ]);
 
+export const RiskPrioritySchema = z.enum(["HIGH", "MEDIUM", "LOW"]);
+
 export const SpecDetailRiskSchema = z.object({
   id: z.uuid(),
   sectionTitle: z.string(),
   riskType: RiskTypeSchema,
-  priority: z.enum(["HIGH", "MEDIUM", "LOW"]),
+  priority: RiskPrioritySchema,
   detail: z.string().optional(),
   referenceText: z.string().optional(),
 });
@@ -135,18 +147,29 @@ export const SpecDetailVersionSchema = z.object({
   updatedAt: z.string(),
 });
 
+export const SpecDetailMomFileSchema = z.object({
+  fileName: z.string(),
+  extension: z.enum(["txt", "pdf", "docx"]),
+});
+
 export const SpecDetailSchema = z.object({
   id: z.uuid(),
   versionId: z.uuid(),
   name: z.string(),
+  /** Template name (main template’s current version title). */
+  templateName: z.string(),
   description: z.string().optional(),
-  status: SpecStatusSchema,
-  language: LanguageSchema,
+  status: SpecStatusCodeSchema,
+  language: LanguageCodeSchema,
   version: z.number(),
   createdByName: z.string(),
   createdAt: z.string(),
   updatedAt: z.string(),
+  /** Original MOM in object storage; download via `GET /specs/:versionId/mom`. */
+  momFile: SpecDetailMomFileSchema.nullable(),
   sections: z.array(SpecDetailSectionSchema),
   risks: z.array(SpecDetailRiskSchema),
   versions: z.array(SpecDetailVersionSchema),
 });
+
+export type SpecDetailDto = z.infer<typeof SpecDetailSchema>;
