@@ -15,13 +15,11 @@ export class QueueConfigService {
     return this.configService.getOrThrow<string>(`${this.prefix}.region`);
   }
 
-  get accessKeyId(): string {
-    return this.configService.getOrThrow<string>(`${this.prefix}.accessKeyId`);
+  get accessKeyId(): string | undefined {
+    return this.configService.get<string>(`${this.prefix}.accessKeyId`);
   }
 
-  get secretAccessKey(): string {
-    return this.configService.getOrThrow<string>(
-      `${this.prefix}.secretAccessKey`,
-    );
+  get secretAccessKey(): string | undefined {
+    return this.configService.get<string>(`${this.prefix}.secretAccessKey`);
   }
 }

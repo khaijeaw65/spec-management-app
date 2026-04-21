@@ -3,6 +3,7 @@ import {
   DeleteMessageCommand,
   SendMessageCommand,
   SQSClient,
+  SQSClientConfig,
 } from '@aws-sdk/client-sqs';
 import { Injectable } from '@nestjs/common';
 import {
@@ -16,13 +17,16 @@ export class AwsSqsService implements IQueueService {
   private readonly client: SQSClient;
 
   constructor(private readonly configService: QueueConfigService) {
-    this.client = new SQSClient({
+    const clientConfig: SQSClientConfig = {
       region: this.configService.region,
-      credentials: {
+    };
+    if (this.configService.accessKeyId && this.configService.secretAccessKey) {
+      clientConfig.credentials = {
         accessKeyId: this.configService.accessKeyId,
         secretAccessKey: this.configService.secretAccessKey,
-      },
-    });
+      };
+    }
+    this.client = new SQSClient(clientConfig);
   }
 
   async sendMessage(message: string): Promise<void> {

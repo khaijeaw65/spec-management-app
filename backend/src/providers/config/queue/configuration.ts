@@ -9,12 +9,24 @@ export default registerAs('queue', () => {
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
   };
 
-  const schema = z.object({
-    url: z.string(),
-    region: z.string(),
-    accessKeyId: z.string().optional(),
-    secretAccessKey: z.string().optional(),
-  });
+  const schema = z
+    .object({
+      url: z.string(),
+      region: z.string(),
+      accessKeyId: z.string().optional(),
+      secretAccessKey: z.string().optional(),
+    })
+    .refine(
+      (data) => {
+        const hasKey = Boolean(data.accessKeyId);
+        const hasSecret = Boolean(data.secretAccessKey);
+        return hasKey === hasSecret;
+      },
+      {
+        message:
+          'Set both AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY, or omit both (IAM role / default chain).',
+      },
+    );
 
   const result = schema.safeParse(config);
 

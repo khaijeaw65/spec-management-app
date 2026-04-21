@@ -6,6 +6,7 @@ import {
   ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
+  S3ClientConfig,
   type GetObjectCommandOutput,
   type ListObjectsV2CommandOutput,
 } from '@aws-sdk/client-s3';
@@ -25,13 +26,21 @@ export class AwsS3StorageService implements IStorageService {
   constructor(private readonly configService: StorageConfigService) {
     this.region = this.configService.region;
     this.bucket = this.configService.bucket;
-    this.client = new S3Client({
+
+    const clientConfig: S3ClientConfig = {
       region: this.region,
-      credentials: {
+    };
+
+    // only add credentials if explicitly provided (local dev)
+    // on ECS, task role is used automatically via instance metadata
+    if (this.configService.accessKeyId && this.configService.secretAccessKey) {
+      clientConfig.credentials = {
         accessKeyId: this.configService.accessKeyId,
         secretAccessKey: this.configService.secretAccessKey,
-      },
-    });
+      };
+    }
+
+    this.client = new S3Client(clientConfig);
   }
 
   async uploadFile(
