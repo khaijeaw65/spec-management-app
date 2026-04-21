@@ -40,7 +40,6 @@ jobs:
 
       - name: Build, tag and push image to ECR
         id: build-image
-        working-directory: backend
         env:
           IMAGE_TAG: ${{ github.sha }}
         run: |
@@ -94,3 +93,5 @@ jobs:
           service: ${{ env.WORKER_SERVICE }}
           cluster: ${{ env.ECS_CLUSTER }}
           wait-for-service-stability: true
+      
+      
