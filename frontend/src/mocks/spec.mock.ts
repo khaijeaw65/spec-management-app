@@ -11,6 +11,7 @@ export const MOCK_SPECIFICATIONS: SpecificationListItem[] = [
     sectionCount: 5,
     language: "EN",
     status: "REVIEWED",
+    pendingVersionId: null,
     updatedAt: "2024-03-15T12:00:00.000Z",
   },
   {
@@ -22,6 +23,7 @@ export const MOCK_SPECIFICATIONS: SpecificationListItem[] = [
     sectionCount: 3,
     language: "TH",
     status: "PROCESSING",
+    pendingVersionId: null,
     updatedAt: "2024-03-14T12:00:00.000Z",
   },
   {
@@ -33,6 +35,7 @@ export const MOCK_SPECIFICATIONS: SpecificationListItem[] = [
     sectionCount: 7,
     language: "EN",
     status: "REVIEWED",
+    pendingVersionId: null,
     updatedAt: "2024-03-10T12:00:00.000Z",
   },
   {
@@ -44,6 +47,7 @@ export const MOCK_SPECIFICATIONS: SpecificationListItem[] = [
     sectionCount: 4,
     language: "TH",
     status: "REVIEWED",
+    pendingVersionId: null,
     updatedAt: "2024-03-08T12:00:00.000Z",
   },
   {
@@ -55,7 +59,21 @@ export const MOCK_SPECIFICATIONS: SpecificationListItem[] = [
     sectionCount: 6,
     language: "EN",
     status: "COMPLETED",
+    pendingVersionId: "22222222-2222-4222-8222-222222222201",
     updatedAt: "2024-03-05T12:00:00.000Z",
+  },
+  {
+    id: "spec-regenerating-demo",
+    versionId: "11111111-1111-4111-8111-111111111199",
+    title: "Regenerating Demo (COMPLETED + pending)",
+    templateLabel: "Standard Template",
+    version: 1,
+    sectionCount: 4,
+    language: "EN",
+    status: "COMPLETED",
+    /** Placeholder UUID representing in-flight regeneration in demos. */
+    pendingVersionId: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+    updatedAt: "2024-04-01T12:00:00.000Z",
   },
   {
     id: "spec-payment-gateway",
@@ -66,6 +84,7 @@ export const MOCK_SPECIFICATIONS: SpecificationListItem[] = [
     sectionCount: 8,
     language: "TH",
     status: "REVIEWED",
+    pendingVersionId: null,
     updatedAt: "2024-02-28T12:00:00.000Z",
   },
   {
@@ -77,6 +96,7 @@ export const MOCK_SPECIFICATIONS: SpecificationListItem[] = [
     sectionCount: 5,
     language: "EN",
     status: "REVIEWED",
+    pendingVersionId: null,
     updatedAt: "2024-02-20T12:00:00.000Z",
   },
   {
@@ -88,6 +108,7 @@ export const MOCK_SPECIFICATIONS: SpecificationListItem[] = [
     sectionCount: 9,
     language: "EN",
     status: "REVIEWED",
+    pendingVersionId: null,
     updatedAt: "2024-02-15T12:00:00.000Z",
   },
 ];

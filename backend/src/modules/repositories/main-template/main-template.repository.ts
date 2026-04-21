@@ -18,6 +18,7 @@ export class MainTemplateRepository implements IMainTemplateRepository {
         },
       },
       relations: {
+        user: true,
         currentVersion: {
           templateSections: true,
         },

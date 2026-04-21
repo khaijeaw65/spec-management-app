@@ -1,9 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { MainGeneratedSpecEntity } from 'src/entities/main-generated-spec.entity';
-import { DeepPartial, DeleteResult, Repository, UpdateResult } from 'typeorm';
+import {
+  Brackets,
+  DeepPartial,
+  DeleteResult,
+  Repository,
+  UpdateResult,
+} from 'typeorm';
 import { IMainGenerateSpecRepository } from './main-genereate-spec.repository.interface';
-import { SpecListQuery } from '@spec-app/schemas';
+import { type DashboardStatKind, SpecListQuery } from '@spec-app/schemas';
+import { SpecStatusCode } from 'src/types/spec-status-code.enum';
 
 @Injectable()
 export class MainGenerateSpecRepository implements IMainGenerateSpecRepository {
@@ -12,20 +19,32 @@ export class MainGenerateSpecRepository implements IMainGenerateSpecRepository {
     private readonly repo: Repository<MainGeneratedSpecEntity>,
   ) {}
 
-  async findAll(query: SpecListQuery) {
+  async findAll(userId: string, query: SpecListQuery) {
     const qb = this.repo
       .createQueryBuilder('mainGeneratedSpec')
       .leftJoinAndSelect('mainGeneratedSpec.template', 'template')
       .leftJoinAndSelect('template.currentVersion', 'templateCurrentVersion')
       .leftJoinAndSelect('mainGeneratedSpec.currentVersion', 'currentVersion')
+      .leftJoinAndSelect('mainGeneratedSpec.pendingVersion', 'pendingVersion')
       .leftJoinAndSelect('currentVersion.status', 'status')
       .leftJoinAndSelect('currentVersion.language', 'language')
       .leftJoinAndSelect('currentVersion.templateVersion', 'templateVersion')
+      .leftJoinAndSelect('pendingVersion.status', 'pendingStatus')
+      .leftJoinAndSelect('pendingVersion.language', 'pendingLanguage')
+      .leftJoinAndSelect(
+        'pendingVersion.templateVersion',
+        'pendingTemplateVersion',
+      )
       .loadRelationCountAndMap(
         'templateVersion.templateSectionsCount',
         'templateVersion.templateSections',
       )
-      .where('mainGeneratedSpec.isActive = TRUE');
+      .loadRelationCountAndMap(
+        'pendingTemplateVersion.templateSectionsCount',
+        'pendingTemplateVersion.templateSections',
+      )
+      .where('mainGeneratedSpec.isActive = TRUE')
+      .andWhere('template.user.id = :userId', { userId });
 
     // search
     if (query?.search) {
@@ -34,14 +53,28 @@ export class MainGenerateSpecRepository implements IMainGenerateSpecRepository {
       });
     }
 
-    // status filter
+    // status filter — match current or pending row (first gen has no currentVersion)
     if (query.status) {
-      qb.andWhere('status.code = :status', { status: query.status });
+      qb.andWhere(
+        new Brackets((sub) => {
+          sub
+            .where('status.code = :status', { status: query.status })
+            .orWhere('pendingStatus.code = :status', { status: query.status });
+        }),
+      );
     }
 
     // language filter
     if (query.language) {
-      qb.andWhere('language.code = :language', { language: query.language });
+      qb.andWhere(
+        new Brackets((sub) => {
+          sub
+            .where('language.code = :language', { language: query.language })
+            .orWhere('pendingLanguage.code = :language', {
+              language: query.language,
+            });
+        }),
+      );
     }
 
     // sort
@@ -54,6 +87,9 @@ export class MainGenerateSpecRepository implements IMainGenerateSpecRepository {
         break;
       case 'TITLE_DESC':
         qb.orderBy('mainGeneratedSpec.name', 'DESC');
+        break;
+      case 'LAST_UPDATED':
+        qb.orderBy('mainGeneratedSpec.updatedOn', 'DESC');
         break;
       case 'NEWEST':
       default:
@@ -69,12 +105,48 @@ export class MainGenerateSpecRepository implements IMainGenerateSpecRepository {
     return { items, totalCount, page, limit };
   }
 
+  async getDashboardCount(userId: string, kind: DashboardStatKind) {
+    const qb = this.repo
+      .createQueryBuilder('mainSpec')
+      .innerJoin('mainSpec.template', 'tpl')
+      .innerJoin('tpl.user', 'owner')
+      .leftJoin('mainSpec.currentVersion', 'cv')
+      .leftJoin('mainSpec.pendingVersion', 'pv')
+      .leftJoin('cv.status', 'cs')
+      .leftJoin('pv.status', 'ps')
+      .where('mainSpec.isActive = TRUE')
+      .andWhere('owner.id = :userId', { userId });
+
+    if (kind !== 'total') {
+      const code =
+        kind === 'reviewed'
+          ? SpecStatusCode.REVIEWED
+          : kind === 'processing'
+            ? SpecStatusCode.PROCESSING
+            : SpecStatusCode.FAILED;
+      qb.andWhere('COALESCE(cs.code, ps.code) = :code', { code });
+    }
+
+    const raw = await qb
+      .select('COUNT(DISTINCT mainSpec.id)::int', 'count')
+      .getRawOne<{ count: string | number | null }>();
+
+    const n = (v: string | number | null | undefined) =>
+      v == null
+        ? 0
+        : typeof v === 'number'
+          ? v
+          : Number.parseInt(String(v), 10) || 0;
+
+    return n(raw?.count);
+  }
+
   findById(id: string): Promise<MainGeneratedSpecEntity | null> {
     return this.repo.findOne({
       where: { id, isActive: true },
       relations: {
         user: true,
-        template: true,
+        template: { language: true, currentVersion: true },
         currentVersion: true,
       },
     });
@@ -84,15 +156,20 @@ export class MainGenerateSpecRepository implements IMainGenerateSpecRepository {
     mainSpecId: string,
     versionId: string,
   ): Promise<MainGeneratedSpecEntity | null> {
+    // IsActive is not assigned because previous spec will be flagged as inactive when new spec is generated. And it still need to be viewable
     return this.repo.findOne({
       where: {
         id: mainSpecId,
-        currentVersion: { id: versionId },
-        isActive: true,
+        generatedSpecs: { id: versionId },
       },
       relations: {
         user: true,
         template: { currentVersion: true },
+        pendingVersion: {
+          status: true,
+          language: true,
+          templateVersion: { templateSections: true },
+        },
         currentVersion: {
           language: true,
           status: true,

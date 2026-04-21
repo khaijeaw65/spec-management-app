@@ -27,6 +27,11 @@ import {
   zodToOpenapiResponse,
 } from '../../swagger/zod-to-openapi';
 import { AuthUser } from '../../decorators/auth-user.decorator';
+import {
+  loginExample,
+  refreshTokenExample,
+  registerExample,
+} from './auth.swagger-examples';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -36,10 +41,7 @@ export class AuthController {
   @Public()
   @ApiOperation({ summary: 'Login' })
   @ApiBody({
-    schema: zodToOpenapi(LoginSchema, {
-      email: 'analyst@example.com',
-      password: 'SecurePass2024!',
-    }),
+    schema: zodToOpenapi(LoginSchema, loginExample),
   })
   @ApiCreatedResponse({ schema: zodToOpenapiResponse(LoginResponseSchema) })
   @Post('login')
@@ -59,10 +61,7 @@ export class AuthController {
   @Post('refresh')
   @ApiOperation({ summary: 'Refresh tokens' })
   @ApiBody({
-    schema: zodToOpenapi(RefreshTokenRequestSchema, {
-      refreshToken:
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI1NTBlODQwMC1lMjliLTQxZDQtYTcxNi00NDY2NTU0NDAwMDAiLCJ0eXBlIjoicmVmcmVzaCIsImlhdCI6MTcxMzAwMDgwMH0.signature-placeholder',
-    }),
+    schema: zodToOpenapi(RefreshTokenRequestSchema, refreshTokenExample),
   })
   @ApiOkResponse({ schema: zodToOpenapiResponse(RefreshTokenResponseSchema) })
   refresh(@Body() body: RefreshTokenDto) {
@@ -73,12 +72,7 @@ export class AuthController {
   @Post('register')
   @ApiOperation({ summary: 'Register' })
   @ApiBody({
-    schema: zodToOpenapi(RegisterSchema, {
-      email: 'new.user@example.com',
-      password: 'SecurePass2024!',
-      firstName: 'Somchai',
-      lastName: 'Prasert',
-    }),
+    schema: zodToOpenapi(RegisterSchema, registerExample),
   })
   @ApiCreatedResponse({ schema: zodToOpenapiResponse(RegisterResponseSchema) })
   register(@Body() body: RegisterDto) {

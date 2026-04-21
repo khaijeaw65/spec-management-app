@@ -1,3 +1,5 @@
+import type { SpecDto, SpecListResponseDto } from "@spec-app/schemas";
+
 import type {
   SpecLangFilter,
   SpecSortKey,
@@ -5,8 +7,39 @@ import type {
 } from "@/types/spec-filters.types";
 import type { SpecLanguage, SpecificationListItem } from "@/types/spec.types";
 
+/** Map list API row to UI list item (specifications list + dashboard). */
+export function mapSpecDtoToSpecificationListItem(
+  s: SpecDto,
+): SpecificationListItem {
+  return {
+    id: s.id,
+    versionId: s.versionId,
+    title: s.name,
+    templateLabel: s.template.name,
+    version: s.version,
+    sectionCount: s.sectionCount,
+    language: s.language as SpecificationListItem["language"],
+    status: s.status as SpecificationListItem["status"],
+    pendingVersionId: s.pendingVersionId,
+    updatedAt: s.updatedAt,
+  };
+}
+
 /** Page size for the specifications list (client-side pagination). */
 export const SPEC_LIST_PAGE_SIZE = 5;
+
+/** Poll interval while any spec row is generating (list + dashboard). */
+export const SPEC_IN_FLIGHT_POLL_MS = 4_000;
+
+export function specListResponseHasInFlight(
+  data: SpecListResponseDto | undefined,
+): boolean {
+  return (
+    data?.items.some(
+      (s) => s.status === "PROCESSING" || s.isRegenerating,
+    ) ?? false
+  );
+}
 
 /** Clamp 1-based page index to valid range for the filtered count. */
 export function clampSpecificationListPage(

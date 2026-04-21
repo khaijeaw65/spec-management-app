@@ -7,7 +7,6 @@ import type {
 
 export const STATUS_FILTER_OPTIONS: SpecFilterOption<SpecStatusFilter>[] = [
   { id: "all", label: "All Status" },
-  { id: "PENDING", label: "PENDING" },
   { id: "PROCESSING", label: "PROCESSING" },
   { id: "COMPLETED", label: "COMPLETED" },
   { id: "REVIEWED", label: "REVIEWED" },

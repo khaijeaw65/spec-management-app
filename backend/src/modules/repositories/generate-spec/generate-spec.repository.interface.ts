@@ -18,6 +18,9 @@ export abstract class IGenerateSpecRepository {
   abstract findVersionsByMainSpecId(
     mainSpecId: string,
   ): Promise<GeneratedSpecEntity[]>;
+  abstract findLatestVersionByMainSpecId(
+    mainSpecId: string,
+  ): Promise<{ id: string | null; version: number }>;
   abstract create(
     generateSpec: DeepPartial<GeneratedSpecEntity>,
   ): Promise<GeneratedSpecEntity>;

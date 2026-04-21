@@ -87,4 +87,10 @@ export class GeneratedSpecEntity extends BaseEntity {
     (mainGeneratedSpec) => mainGeneratedSpec.currentVersion,
   )
   mainGeneratedSpecsWhereCurrent: MainGeneratedSpecEntity[];
+
+  @OneToMany(
+    () => MainGeneratedSpecEntity,
+    (mainGeneratedSpec) => mainGeneratedSpec.pendingVersion,
+  )
+  mainGeneratedSpecsWherePending: MainGeneratedSpecEntity[];
 }

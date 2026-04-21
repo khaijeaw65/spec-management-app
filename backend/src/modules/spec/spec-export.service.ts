@@ -54,7 +54,6 @@ export class SpecExportService {
 
     const code = spec.status?.code as SpecStatusCode | undefined;
     if (
-      code === SpecStatusCode.PENDING ||
       code === SpecStatusCode.PROCESSING ||
       code === SpecStatusCode.FAILED
     ) {

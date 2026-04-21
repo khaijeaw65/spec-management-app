@@ -11,6 +11,7 @@ const ECOM_DETAIL: SpecificationDetail = {
     "Complete specification for building a modern e-commerce platform.",
   templateLabel: "Standard Template",
   status: "REVIEWED",
+  pendingVersionId: null,
   language: "EN",
   version: 2,
   createdByName: "John Doe",
@@ -86,12 +87,14 @@ const ECOM_DETAIL: SpecificationDetail = {
   ],
   versions: [
     {
+      id: "11111111-1111-4111-8111-111111111101",
       version: 2,
       isCurrent: true,
       updatedAt: "2024-03-15T12:00:00.000Z",
       summary: "Updated performance requirements and security guidelines.",
     },
     {
+      id: "11111111-1111-4111-8111-111111111100",
       version: 1,
       isCurrent: false,
       updatedAt: "2024-03-10T10:00:00.000Z",
@@ -108,6 +111,7 @@ function buildPlaceholderDetail(item: SpecificationListItem): SpecificationDetai
     description: `Specification generated from template “${item.templateLabel}”.`,
     templateLabel: item.templateLabel,
     status: item.status,
+    pendingVersionId: item.pendingVersionId ?? null,
     language: item.language,
     version: item.version,
     createdByName: "Demo User",
@@ -125,6 +129,7 @@ function buildPlaceholderDetail(item: SpecificationListItem): SpecificationDetai
     risks: [],
     versions: [
       {
+        id: item.versionId,
         version: item.version,
         isCurrent: true,
         updatedAt: item.updatedAt,

@@ -2,7 +2,7 @@
   "name": "spec-app",
   "private": true,
   "workspaces": [
-    "packages/*"
+    "packages/schemas"
   ],
   "scripts": {
     "build:schemas": "npm run build -w @spec-app/schemas"

@@ -24,6 +24,9 @@ export class MockGenerateSpecRepository implements IGenerateSpecRepository {
   });
   findByMainSpecId = jest.fn().mockResolvedValue([]);
   findVersionsByMainSpecId = jest.fn().mockResolvedValue([]);
+  findLatestVersionByMainSpecId = jest
+    .fn()
+    .mockResolvedValue({ id: null, version: 0 });
   create = jest.fn().mockResolvedValue({ id: 'mock-id', name: 'mock-name' });
   update = jest.fn().mockResolvedValue({ id: 'mock-id', name: 'mock-name' });
   updateStatus = jest

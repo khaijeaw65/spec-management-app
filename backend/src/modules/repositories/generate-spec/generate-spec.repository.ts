@@ -28,9 +28,7 @@ export class GenerateSpecRepository implements IGenerateSpecRepository {
     });
   }
 
-  async findByIdWithMainUser(
-    id: string,
-  ): Promise<GeneratedSpecEntity | null> {
+  async findByIdWithMainUser(id: string): Promise<GeneratedSpecEntity | null> {
     return this.repo.findOne({
       where: {
         id,
@@ -40,6 +38,28 @@ export class GenerateSpecRepository implements IGenerateSpecRepository {
         mainSpec: { user: true },
       },
     });
+  }
+
+  async findLatestVersionByMainSpecId(
+    mainSpecId: string,
+  ): Promise<{ id: string | null; version: number }> {
+    const result = await this.repo
+      .createQueryBuilder('generatedSpec')
+      .select('generatedSpec.id', 'id')
+      .addSelect('generatedSpec.version', 'version')
+      .where('generatedSpec.mainSpec = :mainSpecId', { mainSpecId })
+      .andWhere('generatedSpec.isActive = TRUE')
+      .orderBy('generatedSpec.version', 'DESC')
+      .limit(1)
+      .getRawOne<{ id: string; version: number | string }>();
+
+    return {
+      id: result?.id ?? null,
+      version:
+        typeof result?.version === 'string'
+          ? Number.parseInt(result.version, 10) || 0
+          : (result?.version ?? 0),
+    };
   }
 
   async findByIdForExport(id: string): Promise<GeneratedSpecEntity | null> {
@@ -75,7 +95,6 @@ export class GenerateSpecRepository implements IGenerateSpecRepository {
     return this.repo.find({
       where: {
         mainSpec: { id: mainSpecId },
-        isActive: true,
       },
       relations: {
         templateVersion: true,

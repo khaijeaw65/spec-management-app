@@ -15,6 +15,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/components/providers/theme-provider";
 import { signOut, useSession } from "next-auth/react";
+import { Avatar } from '@heroui/react';
 
 const nav = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -90,7 +91,7 @@ export function Sidebar() {
         </button>
         <div className="flex items-center gap-2 px-2 py-1 text-zinc-300">
           <div className="flex size-8 items-center justify-center rounded-full bg-zinc-700 text-xs font-medium text-white">
-            BA
+            {user?.name?.split(' ').map((name) => name[0])}
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-xs font-medium text-white">{user?.name}</p>

@@ -3,9 +3,9 @@
 import {
   Button,
   Dropdown,
-  Modal,
   SearchField,
   toast,
+  Tooltip,
   useOverlayState,
 } from "@heroui/react";
 import { Pagination } from "@heroui/react/pagination";
@@ -16,14 +16,13 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
-import { FileText, MoreVertical } from "lucide-react";
+import { FileText, Loader2, MoreVertical } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useMemo, useState } from "react";
-
-import type { SpecListResponseDto } from "@spec-app/schemas";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { FilterComboBox } from "@/components/specs/filter-combo-box";
+import { RegenerateSpecModal } from "@/components/specs/regenerate-spec-modal";
 import {
   buildSpecListQueryParams,
   specQueryKeys,
@@ -31,8 +30,11 @@ import {
 import {
   formatListDate,
   languageLabel,
+  mapSpecDtoToSpecificationListItem,
   specificationListVisibleRange,
+  SPEC_IN_FLIGHT_POLL_MS,
   SPEC_LIST_PAGE_SIZE,
+  specListResponseHasInFlight,
 } from "@/lib/spec-list-utils";
 import type {
   SpecFilterOption,
@@ -48,19 +50,6 @@ import {
   getSpecStatuses,
   updateSpecStatus,
 } from "@/services/spec.service";
-
-/** Poll list while any row on the current response is still generating. */
-const SPEC_LIST_IN_FLIGHT_POLL_MS = 4_000;
-
-function specListHasPendingOrProcessing(
-  data: SpecListResponseDto | undefined,
-): boolean {
-  return (
-    data?.items.some(
-      (s) => s.status === "PENDING" || s.status === "PROCESSING",
-    ) ?? false
-  );
-}
 
 function patchSpecStatusErrorMessage(err: unknown): string {
   if (isAxiosError(err)) {
@@ -88,11 +77,13 @@ export function SpecificationsList() {
   const [langFilter, setLangFilter] = useState<SpecLangFilter>("all");
   const [sortBy, setSortBy] = useState<SpecSortKey>("newest");
   const [currentPage, setCurrentPage] = useState(1);
-  const [regenerateId, setRegenerateId] = useState<string | null>(null);
+  const [regenerateMainSpecId, setRegenerateMainSpecId] = useState<
+    string | null
+  >(null);
   const regenerateModal = useOverlayState({
-    isOpen: regenerateId !== null,
+    isOpen: regenerateMainSpecId !== null,
     onOpenChange: (open) => {
-      if (!open) setRegenerateId(null);
+      if (!open) setRegenerateMainSpecId(null);
     },
   });
 
@@ -137,10 +128,42 @@ export function SpecificationsList() {
     queryFn: () => getSpecs(listParams),
     placeholderData: keepPreviousData,
     refetchInterval: (query) =>
-      specListHasPendingOrProcessing(query.state.data)
-        ? SPEC_LIST_IN_FLIGHT_POLL_MS
+      specListResponseHasInFlight(query.state.data)
+        ? SPEC_IN_FLIGHT_POLL_MS
         : false,
   });
+
+  const listRegenPrevRef = useRef<
+    Record<string, { pendingVersionId: string | null; versionId: string }>
+  >({});
+
+  useEffect(() => {
+    const items = specsQuery.data?.items;
+    if (!items?.length) return;
+
+    const next: Record<
+      string,
+      { pendingVersionId: string | null; versionId: string }
+    > = { ...listRegenPrevRef.current };
+
+    for (const item of items) {
+      const prev = listRegenPrevRef.current[item.id];
+      if (
+        prev &&
+        prev.pendingVersionId &&
+        !item.pendingVersionId &&
+        item.versionId !== prev.versionId
+      ) {
+        toast.success(`✓ ${item.name} has been regenerated`);
+      }
+      next[item.id] = {
+        pendingVersionId: item.pendingVersionId,
+        versionId: item.versionId,
+      };
+    }
+
+    listRegenPrevRef.current = next;
+  }, [specsQuery.data]);
 
   const markReviewedMutation = useMutation({
     mutationFn: (mainSpecId: string) =>
@@ -204,22 +227,8 @@ export function SpecificationsList() {
   const specs: SpecificationListItem[] = useMemo(() => {
     const items = specsQuery.data?.items;
     if (!items) return [];
-    return items.map((s) => ({
-      id: s.id,
-      versionId: s.versionId,
-      title: s.name,
-      templateLabel: s.templateName,
-      version: s.version,
-      sectionCount: s.sectionCount,
-      language: s.language as SpecificationListItem["language"],
-      status: s.status as SpecificationListItem["status"],
-      updatedAt: s.updatedAt,
-    }));
+    return items.map(mapSpecDtoToSpecificationListItem);
   }, [specsQuery.data?.items]);
-
-  const confirmRegenerate = useCallback(() => {
-    regenerateModal.close();
-  }, [regenerateModal]);
 
   return (
     <div className="space-y-4">
@@ -379,7 +388,25 @@ export function SpecificationsList() {
                   <span className="rounded-md border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-xs font-medium text-zinc-700 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
                     {languageLabel(spec.language)}
                   </span>
-                  <SpecStatusBadge status={spec.status} />
+                  <span className="inline-flex flex-wrap items-center gap-1">
+                    <SpecStatusBadge status={spec.status} />
+                    {(spec.status === "COMPLETED" ||
+                      spec.status === "REVIEWED") &&
+                    spec.pendingVersionId !== null ? (
+                      <span
+                        className={cn(
+                          "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium",
+                          "bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300",
+                        )}
+                      >
+                        <Loader2
+                          aria-hidden
+                          className="size-3.5 animate-spin"
+                        />
+                        Regenerating...
+                      </span>
+                    ) : null}
+                  </span>
                   <span className="w-24 text-right text-sm text-zinc-500 tabular-nums dark:text-zinc-400">
                     {formatListDate(spec.updatedAt)}
                   </span>
@@ -406,14 +433,32 @@ export function SpecificationsList() {
                             View
                           </Dropdown.Item>
                         ) : null}
-                        <Dropdown.Item
-                          onAction={() => {
-                            setRegenerateId(spec.id);
-                          }}
-                          textValue="Regenerate"
-                        >
-                          Regenerate
-                        </Dropdown.Item>
+                        {spec.pendingVersionId !== null ? (
+                          <Tooltip.Root>
+                            <Tooltip.Trigger>
+                              <div className="w-full">
+                                <Dropdown.Item
+                                  isDisabled
+                                  textValue="Regenerate"
+                                >
+                                  Regenerate
+                                </Dropdown.Item>
+                              </div>
+                            </Tooltip.Trigger>
+                            <Tooltip.Content>
+                              Regeneration already in progress
+                            </Tooltip.Content>
+                          </Tooltip.Root>
+                        ) : (
+                          <Dropdown.Item
+                            onAction={() => {
+                              setRegenerateMainSpecId(spec.id);
+                            }}
+                            textValue="Regenerate"
+                          >
+                            Regenerate
+                          </Dropdown.Item>
+                        )}
                         {spec.status === "REVIEWED" ||
                         spec.status === "PROCESSING" ||
                         spec.status === "FAILED" ? null : (
@@ -479,38 +524,10 @@ export function SpecificationsList() {
         </>
       )}
 
-      <Modal.Root state={regenerateModal}>
-        <Modal.Trigger
-          aria-hidden
-          className="sr-only pointer-events-none"
-          tabIndex={-1}
-        />
-        <Modal.Backdrop isDismissable>
-          <Modal.Container placement="center" size="md">
-            <Modal.Dialog aria-labelledby="regenerate-dialog-title">
-              <Modal.Header>
-                <Modal.Heading id="regenerate-dialog-title">
-                  Regenerate specification?
-                </Modal.Heading>
-              </Modal.Header>
-              <Modal.Body>
-                This will create a new version. Previous versions remain viewable.
-              </Modal.Body>
-              <Modal.Footer className="flex justify-end gap-2">
-                <Button variant="outline" onPress={() => regenerateModal.close()}>
-                  Cancel
-                </Button>
-                <Button
-                  className="bg-blue-600 text-white"
-                  onPress={confirmRegenerate}
-                >
-                  Confirm
-                </Button>
-              </Modal.Footer>
-            </Modal.Dialog>
-          </Modal.Container>
-        </Modal.Backdrop>
-      </Modal.Root>
+      <RegenerateSpecModal
+        state={regenerateModal}
+        mainSpecId={regenerateMainSpecId ?? ""}
+      />
     </div>
   );
 }

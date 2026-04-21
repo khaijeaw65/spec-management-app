@@ -19,10 +19,9 @@ export const CreateSpecStep1Schema = z.discriminatedUnion("inputMethod", [
 
 export type CreateSpecStep1Dto = z.infer<typeof CreateSpecStep1Schema>;
 
-/** Step 2 — template, language, spec name, optional description (maps to `main_generated_spec`). */
+/** Step 2 — template, spec name, optional description (language comes from the template). */
 export const CreateSpecStep2Schema = z.object({
   templateId: z.string().min(1, { message: "Select a template." }),
-  language: z.string(),
   name: z
     .string()
     .trim()
@@ -53,7 +52,6 @@ export const CreateSpecSchema = z.object({
   inputType: z.enum(["TEXT", "FILE"]),
   mainTemplateId: z.uuid(),
   versionId: z.uuid(),
-  language: LanguageCodeSchema,
 });
 
 export type CreateSpecDto = z.infer<typeof CreateSpecSchema>;
@@ -64,7 +62,9 @@ export const GenerateSpecResponseSchema = z.object({
   versionId: z.uuid(),
 });
 
-export type GenerateSpecResponseDto = z.infer<typeof GenerateSpecResponseSchema>;
+export type GenerateSpecResponseDto = z.infer<
+  typeof GenerateSpecResponseSchema
+>;
 
 /** `PATCH /specs/:id/status` — `id` is main spec id; status applies to the current version row. */
 export const UpdateSpecStatusSchema = z.object({
@@ -78,6 +78,8 @@ export const SpecSortSchema = z.enum([
   "OLDEST",
   "TITLE_ASC",
   "TITLE_DESC",
+  /** Main spec `updatedOn` descending (e.g. dashboard recent activity). */
+  "LAST_UPDATED",
 ]);
 
 export const SpecListQuerySchema = z.object({
@@ -91,16 +93,25 @@ export const SpecListQuerySchema = z.object({
 
 export type SpecListQuery = z.infer<typeof SpecListQuerySchema>;
 
+export const SpecTemplateSchema = z.object({
+  id: z.uuid(),
+  versionId: z.uuid(),
+  name: z.string(),
+});
+
 export const SpecSchema = z.object({
   id: z.uuid(),
   versionId: z.uuid(),
   name: z.string(),
-  templateName: z.string(),
   version: z.number(),
   sectionCount: z.number(),
   language: z.string(),
   status: SpecStatusCodeSchema,
+  /** True when a stable current version exists and a new version is generating. */
+  isRegenerating: z.boolean(),
+  pendingVersionId: z.string().uuid().nullable(),
   updatedAt: z.string(),
+  template: SpecTemplateSchema,
 });
 
 export type SpecDto = z.infer<typeof SpecSchema>;
@@ -113,6 +124,22 @@ export const SpecListResponseSchema = z.object({
 });
 
 export type SpecListResponseDto = z.infer<typeof SpecListResponseSchema>;
+
+/** Path segment for `GET /specs/dashboard/counts/:kind`. */
+export const DashboardStatKindSchema = z.enum([
+  "total",
+  "reviewed",
+  "processing",
+  "failed",
+]);
+
+export type DashboardStatKind = z.infer<typeof DashboardStatKindSchema>;
+
+export const DashboardStatCountSchema = z.object({
+  count: z.number().int().min(0),
+});
+
+export type DashboardStatCountDto = z.infer<typeof DashboardStatCountSchema>;
 
 export const SpecDetailSectionSchema = z.object({
   id: z.uuid(),
@@ -160,6 +187,7 @@ export const SpecDetailSchema = z.object({
   templateName: z.string(),
   description: z.string().optional(),
   status: SpecStatusCodeSchema,
+  pendingVersionId: z.string().uuid().nullable(),
   language: LanguageCodeSchema,
   version: z.number(),
   createdByName: z.string(),
@@ -173,3 +201,19 @@ export const SpecDetailSchema = z.object({
 });
 
 export type SpecDetailDto = z.infer<typeof SpecDetailSchema>;
+
+export const RegenerateSpecSchema = z.object({
+  momContent: z
+    .string()
+    .min(50, { message: "Meeting notes must be at least 50 characters." }),
+  inputType: z.enum(["TEXT", "FILE"]),
+});
+
+export type RegenerateSpecDto = z.infer<typeof RegenerateSpecSchema>;
+
+export const UpdateSpecMetaDataSchema = z.object({
+  name: z.string().optional(),
+  description: z.string().optional(),
+});
+
+export type UpdateSpecMetaDataDto = z.infer<typeof UpdateSpecMetaDataSchema>;

@@ -36,6 +36,7 @@ export function mapSpecDetailDtoToSpecificationDetail(
     description: dto.description ?? "",
     templateLabel: dto.templateName,
     status: dto.status,
+    pendingVersionId: dto.pendingVersionId ?? null,
     language: dto.language,
     version: dto.version,
     createdByName: dto.createdByName,
@@ -62,6 +63,7 @@ export function mapSpecDetailDtoToSpecificationDetail(
       contextQuote: r.referenceText ?? "",
     })),
     versions: dto.versions.map((v) => ({
+      id: v.id,
       version: v.version,
       isCurrent: v.id === dto.versionId,
       updatedAt: v.updatedAt,

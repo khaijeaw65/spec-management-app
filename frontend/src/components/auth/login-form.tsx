@@ -11,9 +11,10 @@ import {
   TextField,
 } from "@heroui/react";
 import Image from "next/image";
+import Link from "next/link";
 import { Controller, useForm } from "react-hook-form";
 
-import { signIn } from 'next-auth/react';
+import { signIn } from "next-auth/react";
 
 export function LoginForm() {
   const {
@@ -128,6 +129,12 @@ export function LoginForm() {
           >
             Sign In
           </Button>
+          <Link
+            className="flex h-11 w-full items-center justify-center rounded-lg border border-zinc-200 bg-zinc-50 text-center text-sm font-semibold text-zinc-900 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-100 dark:hover:bg-zinc-800"
+            href="/register"
+          >
+            Create an account
+          </Link>
         </form>
       </Card.Content>
     </Card.Root>

@@ -40,13 +40,6 @@ export class SpecWorkerService {
     const { generatedSpecId } = parsedBody;
     let lastError: Error | undefined;
 
-    await this.specService.updateSpecStatus(
-      generatedSpecId,
-      SpecStatusCode.PROCESSING,
-    );
-
-    console.log('process job');
-
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       try {
         await this.processJob(generatedSpecId);
@@ -86,6 +79,18 @@ export class SpecWorkerService {
     } catch (err) {
       this.logger.error(
         `Failed to mark spec as FAILED: ${generatedSpecId}`,
+        err instanceof Error ? err.stack : String(err),
+        SpecWorkerService.name,
+      );
+    }
+
+    try {
+      await this.specService.clearPendingVersionAfterGenerationFailure(
+        generatedSpecId,
+      );
+    } catch (err) {
+      this.logger.error(
+        `Failed to clear pendingVersion after FAILED: ${generatedSpecId}`,
         err instanceof Error ? err.stack : String(err),
         SpecWorkerService.name,
       );

@@ -39,6 +39,10 @@ export class MainGeneratedSpecEntity extends BaseEntity {
   @JoinColumn({ name: 'current_version' })
   currentVersion?: GeneratedSpecEntity | null;
 
+  @ManyToOne(() => GeneratedSpecEntity, { nullable: true })
+  @JoinColumn({ name: 'pending_version_id' })
+  pendingVersion?: GeneratedSpecEntity | null;
+
   @OneToMany(
     () => GeneratedSpecEntity,
     (generatedSpec) => generatedSpec.mainSpec,

@@ -19,18 +19,25 @@ import {
   ApiConsumes,
   ApiOkResponse,
   ApiOperation,
+  ApiParam,
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
 import {
   type CreateSpecDto,
   CreateSpecSchema,
+  DashboardStatCountSchema,
+  DashboardStatKindSchema,
   GenerateSpecResponseSchema,
   SpecListQuerySchema,
   type SpecListQuery,
   SpecDetailSchema,
   SpecListResponseSchema,
   UpdateSpecStatusSchema,
+  RegenerateSpecSchema,
+  type RegenerateSpecDto,
+  UpdateSpecMetaDataSchema,
+  type UpdateSpecMetaDataDto,
 } from '@spec-app/schemas';
 import {
   zodToOpenapi,
@@ -42,6 +49,10 @@ import { momFileOptions } from 'src/utils/file-upload/file-upload.config';
 import { SpecStatusCode } from 'src/types/spec-status-code.enum';
 import type { Response } from 'express';
 import { SkipTransform } from 'src/decorators/skip-transform-response.decorator';
+import {
+  generateSpecMultipartExample,
+  regenerateSpecMultipartExample,
+} from './spec.swagger-examples';
 
 @ApiTags('Spec')
 @Controller('specs')
@@ -58,6 +69,28 @@ export class SpecController {
   @ApiOkResponse({ schema: zodToOpenapiResponse(SpecListResponseSchema) })
   async getSpecs(@Query() query: SpecListQuery) {
     return this.specService.getSpecs(query);
+  }
+
+  @Get('dashboard/counts/:kind')
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Dashboard stat count',
+    description:
+      'Single metric for dashboard cards. Use `processing` with polling while specs are generating.',
+  })
+  @ApiParam({
+    name: 'kind',
+    schema: zodToOpenapi(DashboardStatKindSchema),
+  })
+  @ApiOkResponse({
+    schema: zodToOpenapiResponse(DashboardStatCountSchema),
+  })
+  async getDashboardStatCount(@Param('kind') kind: string) {
+    const parsed = DashboardStatKindSchema.safeParse(kind);
+    if (!parsed.success) {
+      throw new BadRequestException('Invalid dashboard count kind');
+    }
+    return this.specService.getDashboardStatCount(parsed.data);
   }
 
   @Get(':mainId/versions/:versionId')
@@ -133,7 +166,7 @@ export class SpecController {
     res.setHeader('Content-Type', contentType);
     res.setHeader(
       'Content-Disposition',
-      `inline; filename="${fileName.replace(/"/g, '')}"`,
+      `inline; filename="${fileName.replaceAll('"', '')}"`,
     );
     res.send(buffer);
   }
@@ -144,15 +177,10 @@ export class SpecController {
   @ApiOperation({ summary: 'Generate spec' })
   @ApiOkResponse({ schema: zodToOpenapiResponse(GenerateSpecResponseSchema) })
   @ApiBody({
-    schema: zodToOpenapiMultipart(CreateSpecSchema, {
-      name: 'E-Commerce Platform Requirements',
-      momContent:
-        'The steering committee approved OAuth2 with refresh-token rotation, PostgreSQL as the system of record, and a phased rollout beginning Q2. Outstanding: exact RTO/RPO targets and whether nightly CSV exports from the legacy warehouse remain mandatory. Next steps: BA to validate inventory sync assumptions with ERP by end of week.',
-      inputType: 'TEXT',
-      mainTemplateId: '550e8400-e29b-41d4-a716-446655440001',
-      versionId: '550e8400-e29b-41d4-a716-446655440002',
-      language: 'EN',
-    }),
+    schema: zodToOpenapiMultipart(
+      CreateSpecSchema,
+      generateSpecMultipartExample,
+    ),
   })
   @UseInterceptors(FileInterceptor('file', momFileOptions))
   async generateSpec(
@@ -165,5 +193,37 @@ export class SpecController {
       );
     }
     return this.specService.generateSpec(body, file);
+  }
+
+  @Post(':id/regenerate')
+  @ApiBearerAuth()
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Regenerate spec' })
+  @ApiOkResponse({ schema: zodToOpenapiResponse(GenerateSpecResponseSchema) })
+  @ApiBody({
+    schema: zodToOpenapiMultipart(
+      RegenerateSpecSchema,
+      regenerateSpecMultipartExample,
+    ),
+  })
+  @UseInterceptors(FileInterceptor('file', momFileOptions))
+  async regenerateSpec(
+    @Param('id') id: string,
+    @Body() body: RegenerateSpecDto,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.specService.regenerateSpec(id, body, file);
+  }
+
+  @Patch(':id/meta-data')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update spec meta data' })
+  @ApiBody({ schema: zodToOpenapi(UpdateSpecMetaDataSchema) })
+  @ApiOkResponse({ description: 'Meta data updated' })
+  async updateSpecMetaData(
+    @Param('id') id: string,
+    @Body() body: UpdateSpecMetaDataDto,
+  ) {
+    return this.specService.updateMetaData(id, body);
   }
 }

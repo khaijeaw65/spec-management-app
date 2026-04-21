@@ -21,6 +21,7 @@
 --  [16] code column added to risk_type
 --  [17] description added to main_generated_spec (user-provided, optional)
 --  [18] priority added to spec_risk (HIGH | MEDIUM | LOW, AI-determined)
+--  [19] pending_version_id added to main_generated_spec (regeneration indicator)
 -- ============================================================
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -205,7 +206,11 @@ CREATE TABLE main_generated_spec (
   -- Avoids joining + status filtering to find latest version.
   -- Only updated after generated_spec reaches COMPLETED.
   -- Never updated on FAILED — keeps pointing to last stable version.
-  current_version UUID,
+  current_version     UUID,
+  -- Set when regeneration starts, cleared on COMPLETED or FAILED.
+  -- Allows list page to show "Regenerating..." indicator
+  -- without moving currentVersion pointer prematurely.
+  pending_version_id  UUID,
   is_active       BOOLEAN      NOT NULL DEFAULT TRUE,
   created_by      UUID         REFERENCES "user"(id),
   created_on      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
@@ -252,6 +257,11 @@ CREATE TABLE generated_spec (
 ALTER TABLE main_generated_spec
   ADD CONSTRAINT fk_main_spec_current_version
   FOREIGN KEY (current_version) REFERENCES generated_spec(id);
+
+-- Wire pending_version_id pointer
+ALTER TABLE main_generated_spec
+  ADD CONSTRAINT fk_main_spec_pending_version
+  FOREIGN KEY (pending_version_id) REFERENCES generated_spec(id);
 
 -- [2] sort_order added — preserves section rendering order per spec version
 CREATE TABLE generated_spec_section (
@@ -327,6 +337,7 @@ CREATE INDEX idx_template_section_template ON template_section(template_id, sort
 
 -- Spec chain
 CREATE INDEX idx_main_spec_user            ON main_generated_spec(user_id, deleted_on);
+CREATE INDEX idx_main_spec_pending_version ON main_generated_spec(pending_version_id) WHERE pending_version_id IS NOT NULL;
 CREATE INDEX idx_generated_spec_main       ON generated_spec(main_spec_id, version);
 CREATE INDEX idx_generated_spec_status     ON generated_spec(status_id);
 CREATE INDEX idx_spec_section_spec         ON generated_spec_section(spec_id, sort_order);

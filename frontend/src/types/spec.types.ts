@@ -1,5 +1,4 @@
 export type SpecStatus =
-  | "PENDING"
   | "PROCESSING"
   | "COMPLETED"
   | "REVIEWED"
@@ -19,6 +18,8 @@ export interface SpecificationListItem {
   sectionCount: number;
   language: SpecLanguage;
   status: SpecStatus;
+  /** Set while a regeneration job is in flight; list row still reflects current version. */
+  pendingVersionId: string | null;
   /** ISO date string for sorting and display */
   updatedAt: string;
 }

@@ -1,4 +1,4 @@
-import { SpecListQuery } from '@spec-app/schemas';
+import { type DashboardStatKind, SpecListQuery } from '@spec-app/schemas';
 import { MainGeneratedSpecEntity } from 'src/entities/main-generated-spec.entity';
 import { DeepPartial, DeleteResult, UpdateResult } from 'typeorm';
 
@@ -10,7 +10,14 @@ export type MainGeneratedSpecListResult = {
 };
 
 export abstract class IMainGenerateSpecRepository {
-  abstract findAll(query: SpecListQuery): Promise<MainGeneratedSpecListResult>;
+  abstract findAll(
+    userId: string,
+    query: SpecListQuery,
+  ): Promise<MainGeneratedSpecListResult>;
+  abstract getDashboardCount(
+    userId: string,
+    kind: DashboardStatKind,
+  ): Promise<number>;
   abstract findById(id: string): Promise<MainGeneratedSpecEntity | null>;
   abstract findByMainAndVersionId(
     mainSpecId: string,

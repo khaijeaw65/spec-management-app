@@ -1,7 +1,6 @@
 import { z } from "zod";
 
 export const SpecStatusCodeSchema = z.enum([
-  "PENDING",
   "PROCESSING",
   "COMPLETED",
   "FAILED",

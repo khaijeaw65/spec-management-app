@@ -37,6 +37,8 @@ export interface SpecDetailRisk {
 }
 
 export interface SpecDetailVersion {
+  /** Generated-spec row id (version row) */
+  id: string;
   version: number;
   isCurrent: boolean;
   updatedAt: string;
@@ -52,6 +54,8 @@ export interface SpecificationDetail {
   description: string;
   templateLabel: string;
   status: SpecStatus;
+  /** Non-null while a new version is generating; UI keeps showing current version. */
+  pendingVersionId: string | null;
   language: SpecLanguage;
   /** Current completed version number (GeneratedSpec). */
   version: number;

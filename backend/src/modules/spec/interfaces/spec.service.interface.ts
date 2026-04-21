@@ -2,7 +2,11 @@ import { GeneratedSpecEntity } from '../../../entities/generated-spec.entity';
 import { RiskTypeEntity } from '../../../entities/risk-type.entity';
 import type { LlmResponse } from '../../gen-ai/ports/llm-client.interface';
 import { SpecStatusCode } from '../../../types/spec-status-code.enum';
-import { CreateSpecDto, GenerateSpecResponseDto } from '@spec-app/schemas';
+import {
+  CreateSpecDto,
+  GenerateSpecResponseDto,
+  RegenerateSpecDto,
+} from '@spec-app/schemas';
 
 export abstract class ISpecService {
   abstract generateSpec(
@@ -27,5 +31,15 @@ export abstract class ISpecService {
   abstract updateSpecStatusForMainSpec(
     mainSpecId: string,
     status: SpecStatusCode,
+  ): Promise<void>;
+
+  abstract regenerateSpec(
+    mainSpecId: string,
+    spec: RegenerateSpecDto,
+    file: Express.Multer.File,
+  ): Promise<GenerateSpecResponseDto>;
+
+  abstract clearPendingVersionAfterGenerationFailure(
+    generatedSpecId: string,
   ): Promise<void>;
 }

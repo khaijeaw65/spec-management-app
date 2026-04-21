@@ -10,8 +10,6 @@ import {
   Card,
   Chip,
   Label,
-  Radio,
-  RadioGroup,
   Skeleton,
   Tabs,
   TextArea,
@@ -31,13 +29,13 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 
+import { languageLabel } from "@/lib/spec-list-utils";
 import { templateQueryKeys } from "@/lib/template-query-keys";
 import { generateSpec } from "@/services/spec.service";
 import { getUserTemplates } from "@/services/template.service";
-import type { SpecLanguage } from "@/types/spec.types";
 import { cn } from "@/lib/utils";
 
 function apiErrorMessage(err: unknown): string {
@@ -60,7 +58,6 @@ type WizardFormValues = {
   fileName: string;
   fileSize: number;
   templateId: string;
-  language: SpecLanguage;
   /** User-provided title; maps to backend `main_generated_spec.name` when wired */
   name: string;
   /** Optional; maps to `main_generated_spec.description` */
@@ -107,7 +104,6 @@ export function CreateSpecificationWizard() {
       fileName: "",
       fileSize: 0,
       templateId: "",
-      language: "EN",
       name: "",
       description: "",
     },
@@ -117,7 +113,11 @@ export function CreateSpecificationWizard() {
   const momContent = watch("momContent");
   const fileName = watch("fileName");
   const templateId = watch("templateId");
-  const language = watch("language");
+
+  const selectedTemplate = useMemo(
+    () => templatesQuery.data?.find((t) => t.id === templateId),
+    [templatesQuery.data, templateId],
+  );
 
   const momLen = momContent.length;
   const momValid = inputMethod === "paste" && momLen >= 50;
@@ -163,7 +163,6 @@ export function CreateSpecificationWizard() {
     setSubmitError(null);
     const step2Parsed = CreateSpecStep2Schema.safeParse({
       templateId: data.templateId,
-      language: data.language,
       name: data.name,
       description: data.description?.trim() || undefined,
     });
@@ -209,7 +208,6 @@ export function CreateSpecificationWizard() {
     form.append("inputType", data.inputMethod === "paste" ? "TEXT" : "FILE");
     form.append("mainTemplateId", tmpl.id);
     form.append("versionId", tmpl.versionId);
-    form.append("language", data.language);
     if (data.inputMethod === "paste") {
       form.append("momContent", data.momContent);
     } else {
@@ -290,7 +288,7 @@ export function CreateSpecificationWizard() {
                     : "text-zinc-500 dark:text-zinc-400",
                 )}
               >
-                Template &amp; language
+                Template &amp; details
               </span>
             </li>
           </ol>
@@ -463,10 +461,11 @@ export function CreateSpecificationWizard() {
                 </div>
                 <div>
                   <Card.Title className="text-lg font-semibold text-zinc-950 dark:text-zinc-50">
-                    Select Template &amp; Language
+                    Name &amp; template
                   </Card.Title>
                   <Card.Description className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-                    Choose a template and the language for generated sections.
+                    Choose a template. Output language matches the template (English
+                    or Thai).
                   </Card.Description>
                 </div>
               </div>
@@ -585,16 +584,26 @@ export function CreateSpecificationWizard() {
                           <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
                             {t.description}
                           </p>
-                          <Chip.Root
-                            color="default"
-                            size="sm"
-                            variant="secondary"
-                            className="mt-2"
-                          >
-                            <Chip.Label>
-                              {t.sectionCount} sections
-                            </Chip.Label>
-                          </Chip.Root>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <Chip.Root
+                              color="default"
+                              size="sm"
+                              variant="secondary"
+                            >
+                              <Chip.Label>
+                                {t.sectionCount} sections
+                              </Chip.Label>
+                            </Chip.Root>
+                            <Chip.Root
+                              color="default"
+                              size="sm"
+                              variant="secondary"
+                            >
+                              <Chip.Label>
+                                {languageLabel(t.language)}
+                              </Chip.Label>
+                            </Chip.Root>
+                          </div>
                         </button>
                       );
                     })}
@@ -607,42 +616,14 @@ export function CreateSpecificationWizard() {
                 ) : null}
               </div>
 
-              <div>
-                <Label.Root className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                  Output language
-                </Label.Root>
-                <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                  Changing language later will require generating a new version.
+              {selectedTemplate ? (
+                <p className="rounded-lg border border-zinc-200 bg-zinc-50/80 px-3 py-2 text-sm text-zinc-700 dark:border-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-300">
+                  <span className="font-medium text-zinc-900 dark:text-zinc-100">
+                    Output language:{" "}
+                  </span>
+                  {languageLabel(selectedTemplate.language)} (from template)
                 </p>
-                <RadioGroup.Root
-                  value={language}
-                  onChange={(v) =>
-                    setValue("language", v as SpecLanguage, {
-                      shouldValidate: true,
-                    })
-                  }
-                  className="mt-3 flex flex-col gap-2"
-                >
-                  <div className="flex flex-wrap gap-6">
-                    <Radio.Root value="EN" className="flex items-center gap-2">
-                      <Radio.Control>
-                        <Radio.Indicator />
-                      </Radio.Control>
-                      <Radio.Content className="text-sm text-zinc-800 dark:text-zinc-200">
-                        EN
-                      </Radio.Content>
-                    </Radio.Root>
-                    <Radio.Root value="TH" className="flex items-center gap-2">
-                      <Radio.Control>
-                        <Radio.Indicator />
-                      </Radio.Control>
-                      <Radio.Content className="text-sm text-zinc-800 dark:text-zinc-200">
-                        TH
-                      </Radio.Content>
-                    </Radio.Root>
-                  </div>
-                </RadioGroup.Root>
-              </div>
+              ) : null}
 
               {submitError ? (
                 <p className="text-sm text-red-600 dark:text-red-400" role="alert">

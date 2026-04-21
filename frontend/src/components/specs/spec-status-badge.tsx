@@ -17,18 +17,6 @@ const base =
 
 export function SpecStatusBadge({ status, className }: Readonly<SpecStatusBadgeProps>) {
   switch (status) {
-    case "PENDING":
-      return (
-        <span
-          className={cn(
-            base,
-            "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
-            className,
-          )}
-        >
-          PENDING
-        </span>
-      );
     case "PROCESSING":
       return (
         <span

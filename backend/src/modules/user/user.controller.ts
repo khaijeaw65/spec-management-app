@@ -17,6 +17,7 @@ import {
   UpdateUserSchema,
   UserSchema,
 } from '@spec-app/schemas';
+import { updateUserExample } from './user.swagger-examples';
 
 @ApiTags('User')
 @Controller('users')
@@ -37,12 +38,7 @@ export class UserController {
   @ApiOperation({ summary: 'Update user by id' })
   @ApiParam({ name: 'id', type: String })
   @ApiBody({
-    schema: zodToOpenapi(UpdateUserSchema, {
-      email: 'somchai.prasert@company.example',
-      firstName: 'Somchai',
-      lastName: 'Prasert',
-      password: 'NewSecurePass2024!',
-    }),
+    schema: zodToOpenapi(UpdateUserSchema, updateUserExample),
   })
   @ApiOkResponse({ schema: zodToOpenapiResponse(UserSchema) })
   updateById(@Param('id') id: string, @Body() body: UpdateUserDto) {

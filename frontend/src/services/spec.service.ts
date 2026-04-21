@@ -5,6 +5,7 @@ import type {
   SpecListQuery,
   SpecListResponseDto,
   SpecStatusDto,
+  UpdateSpecMetaDataDto,
 } from "@spec-app/schemas";
 import { isAxiosError } from "axios";
 
@@ -162,4 +163,28 @@ export async function generateSpec(
     },
   );
   return data;
+}
+
+export async function regenerateSpec(mainSpecId: string, form: FormData): Promise<GenerateSpecResponseDto> {
+  const { data } = await api.post<GenerateSpecResponseDto>(
+    `/specs/${mainSpecId}/regenerate`,
+    form,
+    {
+      transformRequest: (body, headers) => {
+        if (body instanceof FormData) {
+          delete headers["Content-Type"];
+        }
+        return body;
+      },
+    },
+  );
+  return data;
+}
+
+/** `PATCH /specs/:id/meta-data` — `id` is main spec id. */
+export async function updateSpecMetaData(
+  mainSpecId: string,
+  payload: UpdateSpecMetaDataDto,
+): Promise<void> {
+  await api.patch(`/specs/${mainSpecId}/meta-data`, payload);
 }

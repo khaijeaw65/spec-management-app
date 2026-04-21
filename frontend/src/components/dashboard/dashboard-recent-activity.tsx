@@ -37,11 +37,16 @@ export function DashboardRecentActivity({
           Recent activity
         </h2>
         <p className="text-xs text-zinc-500 dark:text-zinc-400">
-          Latest updates across your specifications (demo data).
+          Latest updates across your specifications.
         </p>
       </div>
       <Card.Root className="border border-zinc-200 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
         <Card.Content className="divide-y divide-zinc-100 p-0 dark:divide-zinc-800">
+          {items.length === 0 ? (
+            <p className="px-4 py-8 text-center text-sm text-zinc-500 dark:text-zinc-400">
+              No specifications yet. Create one to see activity here.
+            </p>
+          ) : null}
           {items.map((spec) => (
             <Link
               key={spec.id}

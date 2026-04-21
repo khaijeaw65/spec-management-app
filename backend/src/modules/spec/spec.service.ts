@@ -18,23 +18,39 @@ import { GeneratedSpecEntity } from 'src/entities/generated-spec.entity';
 import { RiskTypeEntity } from 'src/entities/risk-type.entity';
 import { LoggerService } from '../../utils/logger/logger.service';
 import {
-  CreateSpecDto,
+  type CreateSpecDto,
+  type DashboardStatCountDto,
+  type DashboardStatKind,
   GenerateSpecResponseDto,
   LanguageCodeSchema,
+  RegenerateSpecDto,
   RiskPrioritySchema,
   RiskTypeSchema,
   type SpecDetailDto,
+  type SpecDto,
   SpecListQuery,
   SpecListResponseDto,
   SpecStatusCodeSchema,
+  type UpdateSpecMetaDataDto,
 } from '@spec-app/schemas';
 import { IStorageService } from '../storage/ports/storage.service.interface';
 import { IQueueService } from '../queue/ports/queue.service.interface';
 import { IRequestContextService } from '../../contexts/request/interfaces/request.context.interface';
 import { ILanguageRepository } from '../repositories/language/language.repository.interface';
+import { IMainTemplateRepository } from '../repositories/main-template/main-template.repository.interface';
 import { RiskTypeCode } from 'src/types/risk-type-code.enum';
 import { LanguageCode } from 'src/types/language-code.enum';
 import { RiskPriority } from 'src/types/risk-priority.enum';
+import { MainGeneratedSpecEntity } from 'src/entities/main-generated-spec.entity';
+
+type MomExtension = 'txt' | 'pdf' | 'docx';
+
+function pendingVersionIdFromMain(row: {
+  pendingVersion?: { id: string } | null;
+}): string | null {
+  const p = row.pendingVersion;
+  return p == null ? null : p.id;
+}
 
 @Injectable()
 export class SpecService implements ISpecService {
@@ -50,32 +66,62 @@ export class SpecService implements ISpecService {
     private readonly queueService: IQueueService,
     private readonly requestContextService: IRequestContextService,
     private readonly languageRepository: ILanguageRepository,
+    private readonly mainTemplateRepository: IMainTemplateRepository,
   ) {}
 
   async getSpecs(query: SpecListQuery): Promise<SpecListResponseDto> {
     const { items, totalCount, page, limit } =
-      await this.mainGenerateSpecRepository.findAll(query);
-
-    console.log('get specs', items);
+      await this.mainGenerateSpecRepository.findAll(
+        this.requestContextService.userId,
+        query,
+      );
 
     return {
-      items: items.map((spec) => ({
-        id: spec.id,
-        versionId: spec.currentVersion?.id ?? '',
-        name: spec.name,
-        templateName: spec.template.currentVersion!.name,
-        version: spec.currentVersion?.version ?? 1,
-        sectionCount:
-          spec.currentVersion?.templateVersion?.templateSectionsCount ?? 0,
-        status:
-          SpecStatusCodeSchema.safeParse(spec.currentVersion?.status?.code)
-            .data ?? SpecStatusCode.PENDING,
-        language: spec.currentVersion?.language?.code ?? LanguageCode.EN,
-        updatedAt: spec.updatedOn.toISOString(),
-      })),
+      items: items.map((spec) => this.mapMainSpecToDto(spec)),
       totalCount,
       page,
       limit,
+    };
+  }
+
+  async getDashboardStatCount(
+    kind: DashboardStatKind,
+  ): Promise<DashboardStatCountDto> {
+    const count = await this.mainGenerateSpecRepository.getDashboardCount(
+      this.requestContextService.userId,
+      kind,
+    );
+    return { count };
+  }
+
+  private mapMainSpecToDto(spec: MainGeneratedSpecEntity): SpecDto {
+    const activeVersion = spec.currentVersion ?? spec.pendingVersion;
+    const status =
+      SpecStatusCodeSchema.safeParse(activeVersion?.status?.code).data ??
+      SpecStatusCode.PROCESSING;
+    return {
+      id: spec.id,
+      versionId: spec.currentVersion?.id ?? spec.pendingVersion?.id ?? '',
+      name: spec.name,
+      version:
+        spec.currentVersion?.version ?? spec.pendingVersion?.version ?? 1,
+      template: {
+        id: spec.template.id,
+        versionId: spec.template.currentVersion?.id ?? '',
+        name: spec.template.currentVersion?.name ?? '',
+      },
+      sectionCount:
+        spec.currentVersion?.templateVersion?.templateSectionsCount ??
+        spec.pendingVersion?.templateVersion?.templateSectionsCount ??
+        0,
+      status,
+      isRegenerating: !!spec.currentVersion && !!spec.pendingVersion,
+      pendingVersionId: pendingVersionIdFromMain(spec),
+      language:
+        spec.currentVersion?.language?.code ??
+        spec.pendingVersion?.language?.code ??
+        LanguageCode.EN,
+      updatedAt: spec.updatedOn.toISOString(),
     };
   }
 
@@ -92,23 +138,31 @@ export class SpecService implements ISpecService {
     const versions =
       await this.generateSpecRepository.findVersionsByMainSpecId(mainSpecId);
 
+    const activeVersion = spec.currentVersion ?? spec.pendingVersion;
+
     return {
       id: spec.id,
-      versionId: spec.currentVersion?.id ?? '',
+      versionId,
       name: spec.name,
       templateName: spec.template?.currentVersion?.name ?? '',
       description: spec.description ?? undefined,
       status:
-        SpecStatusCodeSchema.safeParse(spec.currentVersion?.status?.code)
-          .data ?? SpecStatusCode.PENDING,
+        SpecStatusCodeSchema.safeParse(activeVersion?.status?.code).data ??
+        SpecStatusCode.PROCESSING,
+      pendingVersionId: pendingVersionIdFromMain(spec),
       language:
-        LanguageCodeSchema.safeParse(spec.currentVersion?.language?.code)
-          .data ?? LanguageCode.EN,
-      version: spec.currentVersion?.version ?? 1,
+        LanguageCodeSchema.safeParse(
+          spec.currentVersion?.language?.code ??
+            spec.pendingVersion?.language?.code,
+        ).data ?? LanguageCode.EN,
+      version:
+        spec.currentVersion?.version ?? spec.pendingVersion?.version ?? 1,
       createdByName: spec.user.firstName + ' ' + spec.user.lastName,
       createdAt: spec.createdOn.toISOString(),
       updatedAt: spec.updatedOn.toISOString(),
-      momFile: await this.buildMomFileDto(spec.currentVersion ?? undefined),
+      momFile: await this.buildMomFileDto(
+        spec.currentVersion ?? spec.pendingVersion ?? undefined,
+      ),
       sections:
         spec.currentVersion?.templateVersion?.templateSections.map(
           (section) => ({
@@ -151,36 +205,104 @@ export class SpecService implements ISpecService {
     dto: CreateSpecDto,
     file?: Express.Multer.File,
   ): Promise<GenerateSpecResponseDto> {
-    const preparedMomFile = this.prepareMomFile(dto.momContent, file);
+    const mainTemplate = await this.mainTemplateRepository.findById(
+      dto.mainTemplateId,
+    );
+    if (mainTemplate?.user?.id !== this.requestContextService.userId) {
+      throw new NotFoundException('Template not found');
+    }
+    if (mainTemplate.currentVersion?.id !== dto.versionId) {
+      throw new BadRequestException(
+        'Template version is out of date. Refresh and try again.',
+      );
+    }
+    const languageParsed = LanguageCodeSchema.safeParse(
+      mainTemplate.language?.code,
+    );
+    if (!languageParsed.success) {
+      throw new BadRequestException('Template has no valid output language');
+    }
 
-    const { mainSpecId, generatedSpec } = await this.createPendingSpec(dto);
+    const createdMainSpec = await this.mainGenerateSpecRepository.create({
+      name: dto.name,
+      description: dto.description ?? undefined,
+      template: {
+        id: dto.mainTemplateId,
+      },
+      user: {
+        id: this.requestContextService.userId,
+      },
+    });
 
-    // use spec id as s3 key — traceable and unique
-    const momS3Key = `mom/${generatedSpec.id}`;
+    const generatedSpec = await this.createProcessingSpec(
+      createdMainSpec.id,
+      dto.versionId,
+      dto.inputType,
+      languageParsed.data,
+    );
+
+    await this.mainGenerateSpecRepository.update({
+      id: createdMainSpec.id,
+      pendingVersion: { id: generatedSpec.id },
+    });
+
+    await this.uploadMomFile(generatedSpec, dto.momContent, file);
+
+    await this.submitSpecForGeneration(generatedSpec);
+
+    return {
+      id: createdMainSpec.id,
+      versionId: generatedSpec.id,
+    };
+  }
+
+  private async createProcessingSpec(
+    mainSpecId: string,
+    templateVersionId: string,
+    inputType: CreateSpecDto['inputType'],
+    languageCode: string,
+  ): Promise<GeneratedSpecEntity> {
+    const language = await this.languageRepository.findByCode(languageCode);
+
+    const processingStatus = await this.specStatusRepository.findByCode(
+      SpecStatusCode.PROCESSING,
+    );
+
+    if (!processingStatus) {
+      throw new Error('PROCESSING status not found');
+    }
+
+    const latestVersion: { id: string | null; version: number } =
+      await this.generateSpecRepository.findLatestVersionByMainSpecId(
+        mainSpecId,
+      );
+
+    const createdGeneratedSpec = await this.generateSpecRepository.create({
+      mainSpec: { id: mainSpecId },
+      templateVersion: { id: templateVersionId },
+      language: { id: language?.id },
+      status: { id: processingStatus.id },
+      momInputType: inputType,
+      version: (latestVersion.version ?? 0) + 1,
+    });
+
+    return createdGeneratedSpec;
+  }
+
+  private async uploadMomFile(
+    generatedSpec: GeneratedSpecEntity,
+    momContent: string | undefined,
+    file?: Express.Multer.File,
+  ): Promise<void> {
+    const preparedMomFile = this.prepareMomFile(momContent, file);
 
     await this.storageService.uploadFile(
       preparedMomFile.buffer,
-      momS3Key,
+      `mom/${generatedSpec.id}`,
       preparedMomFile.contentType,
     );
 
-    // update spec with s3 key after upload
-    await this.generateSpecRepository.update({
-      ...generatedSpec,
-      momS3Key,
-    });
-
-    await this.queueService.sendMessage(
-      JSON.stringify({
-        type: 'GENERATE_SPEC',
-        generatedSpecId: generatedSpec.id,
-      }),
-    );
-
-    return {
-      id: mainSpecId,
-      versionId: generatedSpec.id,
-    };
+    await this.updateSpecWithMomFile(generatedSpec, `mom/${generatedSpec.id}`);
   }
 
   private prepareMomFile(
@@ -204,48 +326,56 @@ export class SpecService implements ISpecService {
     throw new BadRequestException('Either momContent or file must be provided');
   }
 
-  private async createPendingSpec(spec: CreateSpecDto): Promise<{
-    mainSpecId: string;
-    generatedSpec: GeneratedSpecEntity;
-  }> {
-    const language = await this.languageRepository.findByCode(spec.language);
-
-    const createdMainSpec = await this.mainGenerateSpecRepository.create({
-      name: spec.name,
-      description: spec.description ?? undefined,
-      template: {
-        id: spec.mainTemplateId,
-      },
-      user: {
-        id: this.requestContextService.userId,
-      },
+  private async updateSpecWithMomFile(
+    generatedSpec: GeneratedSpecEntity,
+    momS3Key: string,
+  ): Promise<void> {
+    await this.generateSpecRepository.update({
+      ...generatedSpec,
+      momS3Key,
     });
+  }
 
-    const pendingStatus = await this.specStatusRepository.findByCode(
-      SpecStatusCode.PENDING,
+  private async submitSpecForGeneration(
+    generatedSpec: GeneratedSpecEntity,
+  ): Promise<void> {
+    await this.queueService.sendMessage(
+      JSON.stringify({
+        type: 'GENERATE_SPEC',
+        generatedSpecId: generatedSpec.id,
+      }),
+    );
+  }
+
+  public async regenerateSpec(
+    mainSpecId: string,
+    spec: RegenerateSpecDto,
+    file: Express.Multer.File,
+  ) {
+    const mainSpec = await this.mainGenerateSpecRepository.findById(mainSpecId);
+    if (!mainSpec) throw new NotFoundException('Main spec not found');
+
+    const generatedSpec = await this.createProcessingSpec(
+      mainSpecId,
+      mainSpec.template.currentVersion?.id ?? '',
+      spec.inputType,
+      mainSpec.template.language.code,
     );
 
-    if (!pendingStatus) {
-      throw new Error('Pending status not found');
-    }
-
-    const createdGeneratedSpec = await this.generateSpecRepository.create({
-      mainSpec: { id: createdMainSpec.id },
-      templateVersion: { id: spec.versionId },
-      language: { id: language?.id },
-      status: { id: pendingStatus.id },
-      momInputType: spec.inputType,
-      version: 1,
-    });
-
     await this.mainGenerateSpecRepository.update({
-      id: createdMainSpec.id,
-      currentVersion: { id: createdGeneratedSpec.id },
+      id: mainSpecId,
+      pendingVersion: { id: generatedSpec.id },
     });
+
+    await this.uploadMomFile(generatedSpec, spec.momContent, file);
+
+    await this.updateSpecWithMomFile(generatedSpec, `mom/${generatedSpec.id}`);
+
+    await this.submitSpecForGeneration(generatedSpec);
 
     return {
-      mainSpecId: createdMainSpec.id,
-      generatedSpec: createdGeneratedSpec,
+      id: mainSpecId,
+      versionId: generatedSpec.id,
     };
   }
 
@@ -360,10 +490,30 @@ export class SpecService implements ISpecService {
       generationTimeMs,
     });
 
-    // 4. update currentVersion pointer
+    const mainBeforeSwitch = await this.mainGenerateSpecRepository.findById(
+      spec.mainSpec.id,
+    );
+    const previousCurrentId = mainBeforeSwitch?.currentVersion?.id ?? null;
+    if (previousCurrentId && previousCurrentId !== spec.id) {
+      await this.generateSpecRepository.softDelete(previousCurrentId);
+    }
+
     await this.mainGenerateSpecRepository.update({
       id: spec.mainSpec.id,
       currentVersion: { id: spec.id },
+      pendingVersion: null,
+    });
+  }
+
+  async clearPendingVersionAfterGenerationFailure(
+    generatedSpecId: string,
+  ): Promise<void> {
+    const row = await this.generateSpecRepository.findById(generatedSpecId);
+    if (!row?.mainSpec?.id) return;
+
+    await this.mainGenerateSpecRepository.update({
+      id: row.mainSpec.id,
+      pendingVersion: null,
     });
   }
 
@@ -423,7 +573,7 @@ export class SpecService implements ISpecService {
 
   private async resolveMomMeta(spec: GeneratedSpecEntity): Promise<{
     fileName: string;
-    extension: 'txt' | 'pdf' | 'docx';
+    extension: MomExtension;
   }> {
     if (!spec.momS3Key) {
       throw new NotFoundException('MOM not found');
@@ -436,9 +586,7 @@ export class SpecService implements ISpecService {
     return { fileName: `meeting-notes.${extension}`, extension };
   }
 
-  private mimeToMomExt(
-    contentType: string | undefined,
-  ): 'txt' | 'pdf' | 'docx' {
+  private mimeToMomExt(contentType: string | undefined): MomExtension {
     const ct = contentType?.split(';')[0]?.trim().toLowerCase();
     switch (ct) {
       case 'text/plain':
@@ -452,7 +600,7 @@ export class SpecService implements ISpecService {
     }
   }
 
-  private contentTypeForMomExt(ext: 'txt' | 'pdf' | 'docx'): string {
+  private contentTypeForMomExt(ext: MomExtension): string {
     switch (ext) {
       case 'txt':
         return 'text/plain';
@@ -473,5 +621,19 @@ export class SpecService implements ISpecService {
     } catch {
       throw new Error('Failed to parse AI response');
     }
+  }
+
+  public async updateMetaData(
+    mainSpecId: string,
+    metaData: UpdateSpecMetaDataDto,
+  ): Promise<void> {
+    const mainSpec = await this.mainGenerateSpecRepository.findById(mainSpecId);
+    if (!mainSpec) throw new NotFoundException('Main spec not found');
+
+    await this.mainGenerateSpecRepository.update({
+      id: mainSpecId,
+      name: metaData.name ?? mainSpec.name,
+      description: metaData.description ?? mainSpec.description,
+    });
   }
 }

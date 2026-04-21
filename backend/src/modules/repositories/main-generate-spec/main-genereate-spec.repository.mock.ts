@@ -9,6 +9,7 @@ export class MockMainGenerateSpecRepository implements IMainGenerateSpecReposito
         template: { id: 'mock-template-id' },
         name: 'mock-name',
         currentVersion: { id: 'mock-current-version-id' },
+        pendingVersion: null,
         generatedSpecs: [{ id: 'mock-generated-spec-id' }],
       },
     ],
@@ -22,6 +23,7 @@ export class MockMainGenerateSpecRepository implements IMainGenerateSpecReposito
     template: { id: 'mock-template-id' },
     name: 'mock-name',
     currentVersion: { id: 'mock-current-version-id' },
+    pendingVersion: null,
     generatedSpecs: [{ id: 'mock-generated-spec-id' }],
   });
   findByMainAndVersionId = jest.fn().mockResolvedValue({
@@ -30,6 +32,7 @@ export class MockMainGenerateSpecRepository implements IMainGenerateSpecReposito
     template: { id: 'mock-template-id' },
     name: 'mock-name',
     currentVersion: { id: 'mock-current-version-id' },
+    pendingVersion: null,
     generatedSpecs: [{ id: 'mock-generated-spec-id' }],
   });
   findVersions = jest.fn().mockResolvedValue([]);
@@ -39,9 +42,11 @@ export class MockMainGenerateSpecRepository implements IMainGenerateSpecReposito
     template: { id: 'mock-template-id' },
     name: 'mock-name',
     currentVersion: { id: 'mock-current-version-id' },
+    pendingVersion: null,
     generatedSpecs: [{ id: 'mock-generated-spec-id' }],
   });
   update = jest.fn().mockResolvedValue({ id: 'mock-id', name: 'mock-name' });
   delete = jest.fn().mockResolvedValue({ affected: 1 });
   softDelete = jest.fn().mockResolvedValue({ affected: 1 });
+  getDashboardCount = jest.fn().mockResolvedValue(0);
 }

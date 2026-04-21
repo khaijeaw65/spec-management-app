@@ -71,7 +71,7 @@ export default function SpecificationsScreen() {
           <View className="flex-1 bg-white border border-gray-200 rounded-2xl py-4 items-center shadow-sm">
             <AlertCircle color="#4B5563" size={20} className="mb-2" />
             <Text className="text-xl font-bold text-gray-900">8</Text>
-            <Text className="text-[10px] font-bold text-gray-500 mt-1">PENDING</Text>
+            <Text className="text-[10px] font-bold text-gray-500 mt-1">PROCESSING</Text>
           </View>
           
           <View className="flex-1 bg-white border border-gray-200 rounded-2xl py-4 items-center shadow-sm">

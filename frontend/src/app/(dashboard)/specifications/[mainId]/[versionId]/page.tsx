@@ -1,9 +1,11 @@
 "use client";
 
 import type { SpecDetailDto } from "@spec-app/schemas";
+import { toast } from "@heroui/react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
+import { useEffect, useRef } from "react";
 
 import { SpecificationDetailSkeleton } from "@/components/specs/specification-detail-skeleton";
 import { SpecificationDetailView } from "@/components/specs/specification-detail-view";
@@ -13,24 +15,50 @@ import { getSpecDetail } from "@/services/spec.service";
 
 const SPEC_DETAIL_IN_FLIGHT_POLL_MS = 4_000;
 
-function specDetailIsInFlight(data: SpecDetailDto | undefined): boolean {
-  return data?.status === "PENDING" || data?.status === "PROCESSING";
+function specDetailShouldPoll(data: SpecDetailDto | undefined): boolean {
+  if (!data) return false;
+  return (
+    data.status === "PROCESSING" || data.pendingVersionId !== null
+  );
 }
 
 export default function SpecificationDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const mainId = typeof params.mainId === "string" ? params.mainId : "";
   const versionId = typeof params.versionId === "string" ? params.versionId : "";
+  const regenPendingPrevRef = useRef<string | null | undefined>(undefined);
 
   const detailQuery = useQuery({
     queryKey: specQueryKeys.detail(mainId, versionId),
     queryFn: () => getSpecDetail(mainId, versionId),
     enabled: Boolean(mainId && versionId),
     refetchInterval: (query) =>
-      specDetailIsInFlight(query.state.data)
+      specDetailShouldPoll(query.state.data)
         ? SPEC_DETAIL_IN_FLIGHT_POLL_MS
         : false,
   });
+
+  useEffect(() => {
+    const data = detailQuery.data;
+    if (!data) return;
+
+    const prev = regenPendingPrevRef.current;
+    const curr = data.pendingVersionId ?? null;
+
+    if (
+      prev !== undefined &&
+      prev !== null &&
+      curr === null &&
+      (data.status === "COMPLETED" || data.status === "REVIEWED") &&
+      data.versionId !== versionId
+    ) {
+      toast.success("✓ New version is ready");
+      router.replace(`/specifications/${mainId}/${data.versionId}`);
+    }
+
+    regenPendingPrevRef.current = curr;
+  }, [detailQuery.data, mainId, versionId, router]);
 
   if (!mainId || !versionId) {
     return (
@@ -50,7 +78,11 @@ export default function SpecificationDetailPage() {
     );
   }
 
-  if (detailQuery.isPending) {
+  const showDetailSkeleton =
+    !detailQuery.data &&
+    (detailQuery.isPending || detailQuery.isFetching);
+
+  if (showDetailSkeleton) {
     return <SpecificationDetailSkeleton />;
   }
 
