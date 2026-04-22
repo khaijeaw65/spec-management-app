@@ -26,4 +26,8 @@ export class DatabaseConfigService {
   get database(): string {
     return this.configService.getOrThrow<string>(`${this.prefix}.database`);
   }
+
+  get schema(): string {
+    return this.configService.getOrThrow<string>(`${this.prefix}.schema`);
+  }
 }

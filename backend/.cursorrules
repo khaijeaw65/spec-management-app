@@ -3,6 +3,7 @@
 # ============================================================
 # This file is read by Cursor before every prompt.
 # Do not remove or rename this file.
+# For AWS resource details (ARNs, IDs) see .cursorrules.local (not committed)
 # ============================================================
 
 ## Project Overview
@@ -369,7 +370,7 @@ interface GenerationJobPayload {
 - MOM stored in S3 — store s3Key + s3Bucket, never full URLs
 - mom_input_type tracks TEXT vs FILE for analytics — always upload to S3
 - AI metadata stored per GeneratedSpec version
-- spec_risk.priority: HIGH | MEDIUM | LOW — AI-determined
+- spec_risk.priority: HIGH | MEDIUM / LOW — AI-determined
 - main_generated_spec.description: optional, user-provided, editable after creation
 - exported_on: timestamp on generated_spec — no EXPORTED status needed
 - AuditLog: no FK on entity_id — survives entity deletion
@@ -396,33 +397,41 @@ interface GenerationJobPayload {
 - spec-app-redis:      Redis 7 (localhost:6379) — reserved, not wired yet
 - spec-app-sonarqube:  SonarQube community (localhost:9000)
 - SQS: real AWS dev queue (no localstack)
-  Queue name: spec-app-dev-generation-queue
+- Docker network: spec-app-network
 
 ## ECS Deployment
 Single Docker image, two ECS task definitions:
-- spec-app-api-task    → CMD: node dist/main.js
-- spec-app-worker-task → CMD: node dist/worker.main.js
+- spec-app-api-task    → CMD: node dist/main.js (port 8000)
+- spec-app-worker-task → CMD: node dist/worker.main.js (no port)
 
-GitHub Actions builds once, pushes one image to ECR.
-Both tasks pull same image, different CMD override per task definition.
-Dockerfile at monorepo root — builds packages/schemas + backend together.
+GitHub Actions (OIDC — no long-lived keys):
+- Triggers on push to main
+- Builds image from monorepo root Dockerfile
+- Pushes to ECR with git SHA tag + latest tag
+- Deploys both API and Worker ECS services
 
-## AWS Infrastructure
-- VPC: 2 public subnets + 2 private subnets
+Dockerfile at monorepo root:
+- Builds packages/schemas first
+- Then builds backend
+- Production stage copies only dist + node_modules
+
+## AWS Infrastructure (see .cursorrules.local for resource IDs)
+- Region: ap-southeast-1
+- VPC with 2 public + 2 private subnets
 - No NAT Gateway (cost saving)
 - No ALB (cost saving, pre-prod)
-- ECS Fargate in public subnet with public IP enabled
-- RDS PostgreSQL in private subnet (no public access)
-- S3 private bucket: spec-app-dev-storage
-- SQS queue: spec-app-dev-generation-queue
-- Secrets Manager: dev/spec-app/config
-- ECR: 480038062484.dkr.ecr.ap-southeast-1.amazonaws.com/spec-app
-- ECS Cluster: spec-app-cluster
-- API Service: spec-app-api-service (SG: spec-app-api-sg, port 8000)
-- Worker Service: spec-app-worker-service (SG: spec-app-worker-sg)
-- Execution Role: spec-app-ecs-execution-role
-- Task Role: spec-app-ecs-task-role
-- GitHub Actions Role: spec-app-github-actions-role (OIDC)
+- ECS Fargate in public subnets with public IP enabled
+- RDS PostgreSQL in private subnets (no public access)
+- S3 private bucket for MOM storage
+- SQS standard queue for generation jobs
+- Secrets Manager for all app secrets
+- ECR for Docker images
+- CloudWatch Logs for ECS task logs (/ecs/spec-app-api, /ecs/spec-app-worker)
+
+## IAM Roles
+- Execution role: pulls ECR images + reads Secrets Manager + writes CloudWatch logs
+- Task role: SQS (send/receive/delete) + S3 (put/get/delete) — no other permissions
+- GitHub Actions role: ECR push + ECS deploy via OIDC (no long-lived keys)
 
 ## What NOT To Do
 - Do NOT use synchronize: true
@@ -461,3 +470,4 @@ Dockerfile at monorepo root — builds packages/schemas + backend together.
 - Do NOT clear pendingVersion before worker completes or fails
 - Do NOT register TransformResponseInterceptor via app.useGlobalInterceptors
   — use APP_INTERCEPTOR provider in AppModule for Reflector injection support
+- Do NOT commit AWS account IDs, ARNs, or resource names — use .cursorrules.local

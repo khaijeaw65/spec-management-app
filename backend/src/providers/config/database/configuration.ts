@@ -8,6 +8,7 @@ export default registerAs('database', () => {
     username: process.env.DB_USER,
     password: process.env.DB_PASS,
     database: process.env.DB_NAME,
+    schema: process.env.DB_SCHEMA,
   };
 
   const result = z
@@ -17,6 +18,7 @@ export default registerAs('database', () => {
       username: z.string(),
       password: z.string(),
       database: z.string(),
+      schema: z.string(),
     })
     .safeParse(config);
 

@@ -39,9 +39,7 @@ declare global {
       DB_USER?: string;
       DB_PASS?: string;
       DB_NAME?: string;
-
-      REDIS_HOST?: string;
-      REDIS_PORT?: string;
+      DB_SCHEMA?: string;
     }
   }
 }

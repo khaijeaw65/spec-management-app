@@ -46,6 +46,7 @@ import { AuditSubscriber } from './subscribers/audit.subscriber';
         autoLoadEntities: true,
         synchronize: false,
         logging: false,
+        schema: config.schema,
         namingStrategy: new SnakeNamingStrategy(),
         subscribers: [],
         ssl: ['development', 'staging', 'production'].includes(
