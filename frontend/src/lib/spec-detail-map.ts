@@ -65,7 +65,7 @@ export function mapSpecDetailDtoToSpecificationDetail(
     versions: dto.versions.map((v) => ({
       id: v.id,
       version: v.version,
-      isCurrent: v.id === dto.versionId,
+      isCurrent: v.isCurrent,
       updatedAt: v.updatedAt,
       summary: `Version ${v.version}`,
     })),

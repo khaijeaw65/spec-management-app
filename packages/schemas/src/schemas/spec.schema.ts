@@ -172,6 +172,8 @@ export const SpecDetailVersionSchema = z.object({
   version: z.number(),
   createdAt: z.string(),
   updatedAt: z.string(),
+  /** True when this version is the family’s currentVersion (not “the one you’re viewing”). */
+  isCurrent: z.boolean(),
 });
 
 export const SpecDetailMomFileSchema = z.object({

@@ -135,10 +135,26 @@ export class SpecService implements ISpecService {
     );
     if (!spec) throw new NotFoundException('Spec not found');
 
+    // Load the requested generated-spec version (must be viewable even if inactive).
+    const genRepo = this.generateSpecRepository as unknown as {
+      findByIdForDetail: (id: string) => Promise<GeneratedSpecEntity | null>;
+    };
+    const requestedVersion = await genRepo.findByIdForDetail(versionId);
+    if (!requestedVersion) {
+      throw new NotFoundException('Spec version not found');
+    }
+    if (requestedVersion.mainSpec?.id !== mainSpecId) {
+      throw new NotFoundException('Spec version not found');
+    }
+    if (
+      requestedVersion.mainSpec?.user?.id !== this.requestContextService.userId
+    ) {
+      throw new NotFoundException('Spec not found');
+    }
+
     const versions =
       await this.generateSpecRepository.findVersionsByMainSpecId(mainSpecId);
-
-    const activeVersion = spec.currentVersion ?? spec.pendingVersion;
+    const currentVersionId = spec.currentVersion?.id ?? null;
 
     return {
       id: spec.id,
@@ -147,33 +163,26 @@ export class SpecService implements ISpecService {
       templateName: spec.template?.currentVersion?.name ?? '',
       description: spec.description ?? undefined,
       status:
-        SpecStatusCodeSchema.safeParse(activeVersion?.status?.code).data ??
+        SpecStatusCodeSchema.safeParse(requestedVersion.status?.code).data ??
         SpecStatusCode.PROCESSING,
       pendingVersionId: pendingVersionIdFromMain(spec),
       language:
-        LanguageCodeSchema.safeParse(
-          spec.currentVersion?.language?.code ??
-            spec.pendingVersion?.language?.code,
-        ).data ?? LanguageCode.EN,
-      version:
-        spec.currentVersion?.version ?? spec.pendingVersion?.version ?? 1,
+        LanguageCodeSchema.safeParse(requestedVersion.language?.code).data ??
+        LanguageCode.EN,
+      version: requestedVersion.version ?? 1,
       createdByName: spec.user.firstName + ' ' + spec.user.lastName,
       createdAt: spec.createdOn.toISOString(),
       updatedAt: spec.updatedOn.toISOString(),
-      momFile: await this.buildMomFileDto(
-        spec.currentVersion ?? spec.pendingVersion ?? undefined,
-      ),
+      momFile: await this.buildMomFileDto(requestedVersion),
       sections:
-        spec.currentVersion?.templateVersion?.templateSections.map(
-          (section) => ({
-            id: section.id,
-            title: section.title,
-            description: section.description ?? undefined,
-            detail: section.description ?? undefined,
-          }),
-        ) ?? [],
+        requestedVersion.generatedSpecSections?.map((section) => ({
+          id: section.id,
+          title: section.templateSection.title,
+          description: section.templateSection.description ?? undefined,
+          detail: section.detail ?? undefined,
+        })) ?? [],
       risks:
-        spec.currentVersion?.specRisks.map((risk) => ({
+        requestedVersion.specRisks?.map((risk) => ({
           id: risk.id,
           sectionTitle: risk.section?.templateSection.title ?? 'Unknown',
           riskType:
@@ -190,6 +199,7 @@ export class SpecService implements ISpecService {
         version: version.version,
         createdAt: version.createdOn.toISOString(),
         updatedAt: version.updatedOn.toISOString(),
+        isCurrent: currentVersionId != null && version.id === currentVersionId,
       })),
     };
   }
@@ -422,7 +432,7 @@ export class SpecService implements ISpecService {
           spec: { id: spec.id },
           templateSection: { id: templateSection.id },
           sortOrder: templateSection.sortOrder,
-          content: section.content ?? null,
+          detail: section.content ?? null,
         };
       })
       .filter((s) => s !== null);
@@ -546,7 +556,7 @@ export class SpecService implements ISpecService {
   }> {
     const userId = this.requestContextService.userId;
     const spec =
-      await this.generateSpecRepository.findByIdWithMainUser(versionId);
+      await this.generateSpecRepository.findByIdWithMainSpec(versionId);
     if (!spec?.momS3Key?.length || !spec.mainSpec?.user) {
       throw new NotFoundException('MOM not found');
     }

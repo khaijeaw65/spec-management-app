@@ -147,7 +147,15 @@ export class MainGenerateSpecRepository implements IMainGenerateSpecRepository {
       relations: {
         user: true,
         template: { language: true, currentVersion: true },
-        currentVersion: true,
+        currentVersion: {
+          generatedSpecSections: {
+            templateSection: true,
+          },
+          specRisks: {
+            riskType: true,
+            section: { templateSection: true },
+          },
+        },
       },
     });
   }
@@ -174,6 +182,9 @@ export class MainGenerateSpecRepository implements IMainGenerateSpecRepository {
           language: true,
           status: true,
           templateVersion: { templateSections: true },
+          generatedSpecSections: {
+            templateSection: true,
+          },
           specRisks: {
             riskType: true,
             section: { templateSection: true },

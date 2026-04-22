@@ -28,7 +28,28 @@ export class GenerateSpecRepository implements IGenerateSpecRepository {
     });
   }
 
-  async findByIdWithMainUser(id: string): Promise<GeneratedSpecEntity | null> {
+  async findByIdForDetail(id: string): Promise<GeneratedSpecEntity | null> {
+    return this.repo.findOne({
+      where: {
+        id,
+      },
+      relations: {
+        mainSpec: { user: true },
+        language: true,
+        status: true,
+        templateVersion: true,
+        generatedSpecSections: {
+          templateSection: true,
+        },
+        specRisks: {
+          riskType: true,
+          section: { templateSection: true },
+        },
+      },
+    });
+  }
+
+  async findByIdWithMainSpec(id: string): Promise<GeneratedSpecEntity | null> {
     return this.repo.findOne({
       where: {
         id,

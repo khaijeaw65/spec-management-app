@@ -10,7 +10,12 @@ export type GenerateSpecListResult = {
 
 export abstract class IGenerateSpecRepository {
   abstract findById(id: string): Promise<GeneratedSpecEntity | null>;
-  abstract findByIdWithMainUser(
+  /**
+   * Detail view needs to load historical versions too (previous current versions
+   * are soft-deactivated). This method must NOT filter by `isActive`.
+   */
+  abstract findByIdForDetail(id: string): Promise<GeneratedSpecEntity | null>;
+  abstract findByIdWithMainSpec(
     id: string,
   ): Promise<GeneratedSpecEntity | null>;
   abstract findByIdForExport(id: string): Promise<GeneratedSpecEntity | null>;

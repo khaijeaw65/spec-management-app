@@ -8,7 +8,14 @@ export class MockGenerateSpecRepository implements IGenerateSpecRepository {
     status: { id: 'mock-status-id' },
     templateVersion: { id: 'mock-template-version-id' },
   });
-  findByIdWithMainUser = jest.fn().mockResolvedValue({
+  findByIdForDetail = jest.fn().mockResolvedValue({
+    id: 'mock-id',
+    mainSpec: { id: 'mock-main-spec-id' },
+    language: { id: 'mock-language-id' },
+    status: { id: 'mock-status-id' },
+    templateVersion: { id: 'mock-template-version-id' },
+  });
+  findByIdWithMainSpec = jest.fn().mockResolvedValue({
     id: 'mock-id',
     mainSpec: { id: 'mock-main-spec-id', user: { id: 'mock-user-id' } },
     language: { id: 'mock-language-id' },
