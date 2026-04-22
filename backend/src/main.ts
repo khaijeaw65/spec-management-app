@@ -29,6 +29,10 @@ async function bootstrap() {
   app.setGlobalPrefix('api');
   app.enableCors();
   setupSwagger(app);
-  await app.listen(process.env.PORT ?? 3000);
+  await app.listen(process.env.PORT ?? 3000, () => {
+    console.log(
+      `[Spec app API] is running on ${process.env.NODE_ENV} environment on port ${process.env.PORT ?? 3000}`,
+    );
+  });
 }
 void bootstrap();
