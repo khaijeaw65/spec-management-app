@@ -23,6 +23,15 @@ Not a chat AI. AI is only called in controlled workflow steps.
 - Mobile:      Review-only app — separate repo
 - CI/CD:       GitHub Actions → ECR → ECS Fargate
 
+## Environment Convention
+- NODE_ENV=local        → developer machine, Docker PG, no SSL
+- NODE_ENV=development  → shared dev server, RDS dev, SSL enabled
+- NODE_ENV=staging      → pre-prod, mirrors production config
+- NODE_ENV=production   → live, RDS prod, SSL enabled
+- SSL enabled when NODE_ENV !== 'local'
+- AWS credentials: explicit only when present (local dev)
+  on ECS task role handles auth automatically — never require credentials
+
 ## Project Structure
 backend/
   src/
@@ -89,7 +98,8 @@ Zod validation: z.enum(['EN', 'TH']) for language input.
 ## Entity: SpecStatus
 - code: varchar(20), unique, not null — used by app code
 - name: varchar(50), unique, not null — display name
-Values: PENDING | PROCESSING | COMPLETED | FAILED | REVIEWED
+Values: PROCESSING | COMPLETED | FAILED | REVIEWED
+NOTE: PENDING status was removed — specs start with PROCESSING immediately
 Use SpecStatusCode enum, never magic strings.
 
 ## Entity: RiskType
@@ -105,6 +115,8 @@ Use RiskTypeCode enum, never magic strings.
 - Only updated when a template version is finalized
 - Future-proofed for team sharing feature
 - Never updated on draft/failed template versions
+- Language is fixed at template root level — cannot change after creation
+- Language determines spec output language (no separate language selection on create/regen)
 
 ## Entity: TemplateSection
 - title: varchar(255), not null
@@ -114,8 +126,9 @@ Use RiskTypeCode enum, never magic strings.
 
 ## Entity: MainGeneratedSpec
 - name: varchar(255), not null — stable across all versions
-- description: TEXT, nullable — optional user-provided description
-- currentVersion: UUID FK → generated_spec.id, nullable
+- description: TEXT, nullable — optional user-provided description, editable after creation
+- currentVersion: UUID FK → generated_spec.id, nullable — latest COMPLETED version
+- pendingVersion: UUID FK → generated_spec.id, nullable — set on create/regen start, cleared on COMPLETED or FAILED
 
 ## Entity: GeneratedSpec
 - version: int, not null, default 1
@@ -128,7 +141,7 @@ Use RiskTypeCode enum, never magic strings.
 
 ## Entity: SpecRisk
 - priority: varchar(10), not null — 'HIGH' | 'MEDIUM' | 'LOW' — AI-determined
-- section_id: nullable FK → generated_spec_section.id
+- sectionId: nullable FK → generated_spec_section.id
 
 ## Entity: AuditLog (does NOT extend BaseEntity)
 - id: UUID PK
@@ -141,7 +154,6 @@ Use RiskTypeCode enum, never magic strings.
 
 ## Enums
 export enum SpecStatusCode {
-  PENDING = 'PENDING',
   PROCESSING = 'PROCESSING',
   COMPLETED = 'COMPLETED',
   FAILED = 'FAILED',
@@ -178,6 +190,16 @@ export enum RiskPriority {
 - No @Exclude() decorators on entities
 - namingStrategy: SnakeNamingStrategy from typeorm-naming-strategies
 - Always filter isActive: true + deletedOn: IsNull() on active record queries
+- SSL: enabled when NODE_ENV !== 'local' — { rejectUnauthorized: false }
+
+## AWS SDK Credentials Pattern
+- Never require AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY in config validation
+- Make credentials optional in all AWS config services (get not getOrThrow)
+- Only pass credentials to SDK clients when explicitly present:
+  if (accessKeyId && secretAccessKey) { clientConfig.credentials = {...} }
+- On ECS: task role provides credentials automatically via instance metadata
+- On local: credentials from .env used when present
+- Never store AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY in Secrets Manager
 
 ## Transaction Management
 - Use @nestjs-cls/transactional + @nestjs-cls/transactional-adapter-typeorm
@@ -196,12 +218,13 @@ export enum RiskPriority {
 - All config reads from process.env — source does not matter to the app
 - ECS injects Secrets Manager values into process.env before container starts
 
-Planned registerAs domains:
+registerAs domains:
 - 'database'  → DB_HOST, DB_PORT, DB_USER, DB_PASS, DB_NAME
-- 'openai'    → OPENAI_API_KEY
-- 's3'        → S3_BUCKET, S3_REGION
-- 'sqs'       → SQS_QUEUE_URL, SQS_REGION
-- 'jwt'       → JWT_SECRET, JWT_EXPIRES_IN, JWT_REFRESH_EXPIRES_IN
+- 'openai'    → GEN_AI_API_KEY, GEN_AI_MODEL
+- 'storage'   → STORAGE_PROVIDER, AWS_S3_BUCKET, AWS_S3_REGION
+- 'queue'     → SQS_QUEUE_URL, SQS_REGION
+- 'jwt'       → JWT_ACCESS_TOKEN_SECRET, JWT_REFRESH_TOKEN_SECRET,
+                JWT_ACCESS_TOKEN_EXPIRES_IN, JWT_REFRESH_TOKEN_EXPIRES_IN
 
 ## DTO Pattern
 - Zod schemas for all DTOs — inferred types, NOT classes
@@ -239,8 +262,20 @@ Planned registerAs domains:
 
 ## Spec List Behavior
 - List page shows current version only (main_generated_spec with currentVersion)
+- Falls back to pendingVersion for status when currentVersion is NULL (first gen)
+- isRegenerating = true only when BOTH currentVersion AND pendingVersion exist
 - Previous versions accessible via Versions tab on detail page
 - Never list all versions on the list page
+- Always scoped to current authenticated user (userId filter)
+
+## pendingVersion Pattern
+- Set on BOTH first-time spec creation AND regeneration
+- Cleared on COMPLETED (worker success) and FAILED (worker failure)
+- currentVersion NULL + pendingVersion set = first generation in progress
+- currentVersion set + pendingVersion set = regeneration in progress
+- currentVersion set + pendingVersion NULL = stable, no active generation
+- Never update currentVersion until worker COMPLETED
+- isRegenerating flag in list response = !!currentVersion && !!pendingVersion
 
 ## PDF Export
 - Uses pdfkit
@@ -251,35 +286,52 @@ Planned registerAs domains:
 - Export allowed only when status is COMPLETED or REVIEWED
 - PDF structure: header (name, description, metadata) + sections in sortOrder
 - Section with no content → "Not mentioned in the provided information (MOM)"
+- Use @SkipTransform() decorator on export endpoint to bypass TransformResponseInterceptor
+
+## TransformResponseInterceptor
+- Registered via APP_INTERCEPTOR in AppModule (not app.useGlobalInterceptors)
+- Uses Reflector for @SkipTransform() decorator support
+- Returns EMPTY when response already sent (headersSent = true)
+- @SkipTransform() decorator skips wrapping for raw response endpoints (PDF export)
 
 ## Async Generation Flow (SQS)
 API layer responsibilities:
 1. Validate request
-2. Resolve language by code → get id
-3. Save MainGeneratedSpec to DB
-4. Save GeneratedSpec to DB with status PENDING
-5. Save MOM content to S3
+2. Save MainGeneratedSpec to DB
+3. Create GeneratedSpec with status PROCESSING
+4. Set pendingVersion on MainGeneratedSpec
+5. Upload MOM to S3
 6. Push job to SQS
-7. Update GeneratedSpec status PENDING → PROCESSING
-8. Return immediately to user
+7. Return immediately — { id: mainSpecId, versionId: generatedSpecId }
 
 Worker layer responsibilities:
-1. Update status → PROCESSING
+1. Fetch spec + template sections from DB
 2. Fetch MOM from S3
-3. Fetch template sections from DB
-4. Call OpenAI (one call, JSON response)
-5. Parse response — sections + risks
-6. In @Transactional():
+3. Call OpenAI (one call, JSON response)
+4. Parse response — sections + risks
+5. In @Transactional():
    a. Save GeneratedSpecSections
-   b. Save SpecRisks
+   b. Save SpecRisks with priority
    c. Update GeneratedSpec status → COMPLETED + AI metadata
-   d. Deactivate previous versions (isActive = false) + their sections + risks
+   d. Deactivate previous versions (isActive = false)
    e. Update MainGeneratedSpec.currentVersion pointer
-7. Delete SQS message — only after transaction commits
+   f. Clear MainGeneratedSpec.pendingVersion (set to null)
+6. Delete SQS message — only after transaction commits
 On failure (outside transaction):
 - Update GeneratedSpec status → FAILED
+- Clear pendingVersion on MainGeneratedSpec
 - Do NOT update currentVersion
 - Do NOT delete SQS message — let SQS retry
+
+## Regenerate Flow
+1. Fetch MainGeneratedSpec — verify ownership
+2. Create new GeneratedSpec (PROCESSING) with next version number
+3. Set pendingVersion = new spec — do NOT update currentVersion
+4. Upload new MOM to S3
+5. Push to SQS
+6. Return { id: mainSpecId, versionId: newGeneratedSpecId }
+- Template language used automatically — no language selection by user
+- Template always uses mainTemplate.currentVersion at time of regeneration
 
 ## SQS Job Payload
 interface GenerationJobPayload {
@@ -296,6 +348,7 @@ interface GenerationJobPayload {
 - Never update currentVersion before COMPLETED status
 - Never update currentVersion on FAILED status
 - API returns immediately after pushing to SQS
+- Spec language is determined by template language — no user language selection
 
 ## Soft Delete Rules
 - Never hard delete any record
@@ -304,10 +357,11 @@ interface GenerationJobPayload {
 
 ## Database Schema Decisions
 - MainGeneratedSpec.currentVersion — pointer to latest COMPLETED GeneratedSpec
+- MainGeneratedSpec.pendingVersion — pointer to in-progress generation
 - MainTemplate.currentVersion — pointer to latest active Template version
 - section_type table DROPPED — template_section.description serves as AI guidance
 - Language.code used by frontend (EN/TH) — backend resolves to id
-- SpecStatus.code used by app (PENDING/PROCESSING/etc) — backend resolves to id
+- SpecStatus.code used by app — backend resolves to id
 - RiskType.code used by AI response — backend resolves to id
 - Language locked per GeneratedSpec version
 - Spec content is read-only after generation
@@ -316,9 +370,10 @@ interface GenerationJobPayload {
 - mom_input_type tracks TEXT vs FILE for analytics — always upload to S3
 - AI metadata stored per GeneratedSpec version
 - spec_risk.priority: HIGH | MEDIUM | LOW — AI-determined
-- main_generated_spec.description: optional, user-provided at creation
+- main_generated_spec.description: optional, user-provided, editable after creation
 - exported_on: timestamp on generated_spec — no EXPORTED status needed
 - AuditLog: no FK on entity_id — survives entity deletion
+- pending_version_id on main_generated_spec — regeneration indicator
 
 ## Indexes (already in schema.sql, do not re-create)
 - user(email)
@@ -329,6 +384,7 @@ interface GenerationJobPayload {
 - template(main_template_id, version)
 - template_section(template_id, sort_order)
 - main_generated_spec(user_id, deleted_on)
+- main_generated_spec(pending_version_id) WHERE pending_version_id IS NOT NULL
 - generated_spec(main_spec_id, version)
 - generated_spec(status_id)
 - generated_spec_section(spec_id, sort_order)
@@ -349,16 +405,24 @@ Single Docker image, two ECS task definitions:
 
 GitHub Actions builds once, pushes one image to ECR.
 Both tasks pull same image, different CMD override per task definition.
+Dockerfile at monorepo root — builds packages/schemas + backend together.
 
 ## AWS Infrastructure
 - VPC: 2 public subnets + 2 private subnets
 - No NAT Gateway (cost saving)
 - No ALB (cost saving, pre-prod)
-- ECS Fargate in public subnet
+- ECS Fargate in public subnet with public IP enabled
 - RDS PostgreSQL in private subnet (no public access)
-- S3 private bucket
-- SQS queue for generation jobs
-- Secrets Manager for all secrets
+- S3 private bucket: spec-app-dev-storage
+- SQS queue: spec-app-dev-generation-queue
+- Secrets Manager: dev/spec-app/config
+- ECR: 480038062484.dkr.ecr.ap-southeast-1.amazonaws.com/spec-app
+- ECS Cluster: spec-app-cluster
+- API Service: spec-app-api-service (SG: spec-app-api-sg, port 8000)
+- Worker Service: spec-app-worker-service (SG: spec-app-worker-sg)
+- Execution Role: spec-app-ecs-execution-role
+- Task Role: spec-app-ecs-task-role
+- GitHub Actions Role: spec-app-github-actions-role (OIDC)
 
 ## What NOT To Do
 - Do NOT use synchronize: true
@@ -389,3 +453,11 @@ Both tasks pull same image, different CMD override per task definition.
 - Do NOT pass EntityManager to repository methods — use @Transactional() decorator
 - Do NOT delete SQS message on failure — let SQS retry
 - Do NOT update currentVersion inside transaction before all saves complete
+- Do NOT require AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY — make optional
+- Do NOT use getOrThrow for optional AWS credential config values
+- Do NOT add PENDING status — specs start with PROCESSING
+- Do NOT allow language selection on spec create or regenerate — use template language
+- Do NOT update currentVersion before worker completes successfully
+- Do NOT clear pendingVersion before worker completes or fails
+- Do NOT register TransformResponseInterceptor via app.useGlobalInterceptors
+  — use APP_INTERCEPTOR provider in AppModule for Reflector injection support

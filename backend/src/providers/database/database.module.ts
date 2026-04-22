@@ -48,6 +48,11 @@ import { AuditSubscriber } from './subscribers/audit.subscriber';
         logging: false,
         namingStrategy: new SnakeNamingStrategy(),
         subscribers: [],
+        ssl: ['development', 'staging', 'production'].includes(
+          process.env.NODE_ENV ?? '',
+        )
+          ? { rejectUnauthorized: false }
+          : false,
       }),
     }),
   ],
