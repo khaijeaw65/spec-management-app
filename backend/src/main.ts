@@ -27,7 +27,13 @@ async function bootstrap() {
   app.useGlobalFilters(new HttpExceptionFilter());
 
   app.setGlobalPrefix('api');
-  app.enableCors();
+  app.enableCors({
+    origin: [
+      'https://spec-management-app-3ndp-six.vercel.app',
+      process.env.NODE_ENV === 'local' ? 'http://localhost:3000' : undefined,
+    ],
+    credentials: true,
+  });
   setupSwagger(app);
   await app.listen(process.env.PORT ?? 3000, () => {
     console.log(

@@ -1,4 +1,10 @@
 {
   "installCommand": "cd .. && npm install && cd frontend && npm install",
-  "buildCommand": "npm run build"
+  "buildCommand": "npm run build",
+  "rewrites": [
+    {
+      "source": "/api-proxy/:path*",
+      "destination": "http://spec-app-alb-463432889.ap-southeast-1.elb.amazonaws.com/:path*"
+    }
+  ]
 }
