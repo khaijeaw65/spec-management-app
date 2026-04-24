@@ -1,0 +1,10 @@
+E-Commerce Platform — MOM excerpt (demo)
+
+Attendees: PM, Tech Lead, BA
+Goals: Define MVP storefront scope and non-functional expectations.
+
+Discussion highlights:
+- Users should be able to reset passwords without contacting support.
+- Admin can manage user permissions and approve refunds when needed.
+- Payment gateway will be integrated before the public launch milestone.
+- Performance targets discussed: high concurrency and sub-2s page loads for key paths.
