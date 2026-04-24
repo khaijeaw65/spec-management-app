@@ -85,3 +85,27 @@ export interface SpecVersionListResponse {
     items: SpecVersion[];
   };
 }
+
+export interface SpecVersion {
+  id: string;
+  version: string;
+  status: SpecStatus;
+  language: SpecLanguage;
+  createdAt: string;
+  updatedAt: string;
+  isCurrent: boolean;
+}
+
+export interface SpecDetail {
+  id: string;
+  mainId: string;
+  name: string;
+  version: string;
+  status: SpecStatus;
+  language: SpecLanguage;
+  sections: SpecSection[];
+  risks: SpecRisk[];
+  createdAt: string;
+  updatedAt: string;
+  versions: SpecVersion[];
+}

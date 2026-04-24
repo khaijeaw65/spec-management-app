@@ -9,7 +9,7 @@ import {
   ChevronLeft, CheckCircle2, Clock, Eye, Globe, AlertTriangle,
 } from 'lucide-react-native';
 import { useTheme } from '@/hooks/useAppTheme';
-import { getSpecDetail } from '@/services/api';
+import { getSpecVersions } from '@/services/api';
 import type { SpecVersion } from '@/types/api';
 
 function formatDate(iso: string): string {
@@ -53,24 +53,21 @@ export default function VersionHistoryScreen() {
   const specName = (name as string) || 'Specification';
 
   const fetchVersions = useCallback(async () => {
-    if (!mainId || !versionId) {
-      setError('Missing specification ID or Version ID');
+    if (!mainId) {
+      setError('Missing specification ID');
       return;
     }
     try {
       setError(null);
-      const data = await getSpecDetail(mainId, versionId);
+      const data = await getSpecVersions(mainId, versionId);
 
-      if (data) {
-        const mockVersion: SpecVersion = {
-          id: data.id,
-          version: data.version,
-          status: data.status,
-          language: data.language,
-          createdAt: data.createdAt,
-          updatedAt: data.updatedAt,
-        };
-        setVersions([mockVersion]);
+      if (data && data.length > 0) {
+        const sortedData = [...data].sort((a, b) => {
+          const vA = parseInt(String(a.version).replace(/\D/g, '')) || 0;
+          const vB = parseInt(String(b.version).replace(/\D/g, '')) || 0;
+          return vB - vA;
+        });
+        setVersions(sortedData);
       } else {
         setVersions([]);
       }
@@ -81,7 +78,7 @@ export default function VersionHistoryScreen() {
         'ไม่สามารถโหลดข้อมูลได้ กรุณาลองใหม่อีกครั้ง';
       setError(message);
     }
-  }, [mainId, versionId]);
+  }, [mainId]);
 
   useEffect(() => {
     (async () => {
@@ -163,18 +160,17 @@ export default function VersionHistoryScreen() {
           )}
 
           {versions.map((v, index) => {
-            const isCurrent = index === 0;
-            const badge = statusBadgeStyle(v.status, c, colors);
-
+            const isLatest = index === 0;
+            const isViewing = v.id === versionId;
             return (
               <View key={v.id || index} className="flex-row mb-0">
 
                 <View className="items-center mr-4">
                   <View
                     className="w-8 h-8 rounded-full items-center justify-center"
-                    style={{ backgroundColor: isCurrent ? colors.processing : c.sectionBg }}
+                    style={{ backgroundColor: isLatest ? colors.processing : c.sectionBg }}
                   >
-                    {isCurrent
+                    {isLatest
                       ? <Clock color={colors.white} size={15} />
                       : <CheckCircle2 color={c.textSecondary} size={15} />
                     }
@@ -187,24 +183,19 @@ export default function VersionHistoryScreen() {
                 <View
                   className="flex-1 mb-5 rounded-2xl border p-4 shadow-sm"
                   style={{
-                    backgroundColor: isCurrent ? c.processingBg : c.card,
-                    borderColor: isCurrent ? colors.processing + '40' : c.border,
+                    backgroundColor: isLatest ? c.processingBg : c.card,
+                    borderColor: isLatest ? colors.processing + '40' : c.border,
                   }}
                 >
                   <View className="flex-row justify-between items-center mb-3">
-                    <Text className="text-[15px] font-bold" style={{ color: isCurrent ? colors.processing : c.textPrimary }}>
+                    <Text className="text-[15px] font-bold" style={{ color: isLatest ? colors.processing : c.textPrimary }}>
                       {v.version ? `Version ${v.version}` : `Version ${index + 1}`}
-                      {isCurrent && (
+                      {isLatest && (
                         <Text className="text-[12px] font-semibold" style={{ color: colors.processing }}>
                           {' '}· Current
                         </Text>
                       )}
                     </Text>
-                    <View className="rounded-full px-3 py-1 border" style={{ backgroundColor: badge.bg, borderColor: badge.border }}>
-                      <Text className="text-[11px] font-bold" style={{ color: badge.text }}>
-                        {v.status}
-                      </Text>
-                    </View>
                   </View>
 
                   <View className="flex-row items-center gap-x-3 mb-3">
@@ -227,16 +218,25 @@ export default function VersionHistoryScreen() {
                   </View>
 
                   <TouchableOpacity
-                    onPress={() => router.back()}
+                    onPress={() => {
+                      if (isViewing) {
+                        router.back();
+                      } else {
+                        router.push({
+                          pathname: '/details' as any,
+                          params: { mainId, versionId: v.id, name: specName }
+                        });
+                      }
+                    }}
                     className="flex-row items-center justify-center gap-x-2 py-2 rounded-xl border"
                     style={{
-                      backgroundColor: isCurrent ? colors.processing + '20' : c.sectionBg,
-                      borderColor: isCurrent ? colors.processing + '60' : c.border,
+                      backgroundColor: isViewing ? colors.processing + '20' : c.sectionBg,
+                      borderColor: isViewing ? colors.processing + '60' : c.border,
                     }}
                   >
-                    <Eye color={isCurrent ? colors.processing : c.textSecondary} size={14} />
-                    <Text className="text-[13px] font-semibold" style={{ color: isCurrent ? colors.processing : c.textSecondary }}>
-                      {isCurrent ? 'Viewing Current' : 'View'}
+                    <Eye color={isViewing ? colors.processing : c.textSecondary} size={14} />
+                    <Text className="text-[13px] font-semibold" style={{ color: isViewing ? colors.processing : c.textSecondary }}>
+                      {isViewing ? 'Viewing' : 'View'}
                     </Text>
                   </TouchableOpacity>
                 </View>

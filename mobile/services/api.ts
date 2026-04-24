@@ -63,12 +63,13 @@ export async function getSpecDetail(mainId: string, versionId: string): Promise<
 }
 
 export async function getSpecVersions(
-  mainId: string
+  mainId: string,
+  versionId: string
 ): Promise<SpecVersion[]> {
-  const { data } = await api.get<SpecVersionListResponse>(
-    `/api/specs/${mainId}/versionsId`
+  const { data } = await api.get<SpecDetailResponse>(
+    `/api/specs/${mainId}/versions/${versionId}`
   );
-  return data?.data?.items ?? [];
+  return data?.data?.versions ?? [];
 }
 
 export async function markAsReviewed(id: string): Promise<void> {
