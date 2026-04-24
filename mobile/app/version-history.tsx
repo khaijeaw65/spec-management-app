@@ -1,147 +1,250 @@
-import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  View, Text, ScrollView, TouchableOpacity,
+  ActivityIndicator, RefreshControl,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { ChevronLeft, GitCommit, CheckCircle2, Clock, User, Eye } from 'lucide-react-native';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import {
+  ChevronLeft, CheckCircle2, Clock, Eye, Globe, AlertTriangle,
+} from 'lucide-react-native';
+import { useTheme } from '@/hooks/useAppTheme';
+import { getSpecVersions } from '@/services/api';
+import type { SpecVersion } from '@/types/api';
 
-const versions = [
-  {
-    version: 'v2.4.0',
-    label: 'Draft',
-    labelColor: '#3B82F6',
-    labelBg: '#EFF6FF',
-    date: 'Oct 24, 2023',
-    author: 'Sarah Jenkins',
-    isCurrent: true,
-    changes: [
-      'Added multi-region shipping support',
-      'Updated WCAG 2.1 accessibility requirements',
-      'Expanded concurrent session limit to 50,000',
-    ],
-  },
-  {
-    version: 'v2.3.0',
-    label: 'Reviewed',
-    labelColor: '#16A34A',
-    labelBg: '#F0FDF4',
-    date: 'Oct 10, 2023',
-    author: 'Michael Chen',
-    isCurrent: false,
-    changes: [
-      'Resolved payment gateway ambiguity in Section 2.4',
-      'Added guest checkout fraud detection notes',
-    ],
-  },
-  {
-    version: 'v2.2.1',
-    label: 'Reviewed',
-    labelColor: '#16A34A',
-    labelBg: '#F0FDF4',
-    date: 'Sep 28, 2023',
-    author: 'Robert Taylor',
-    isCurrent: false,
-    changes: [
-      'Minor clarification on ERP integration endpoints',
-      'Fixed terminology inconsistencies',
-    ],
-  },
-  {
-    version: 'v2.2.0',
-    label: 'Reviewed',
-    labelColor: '#16A34A',
-    labelBg: '#F0FDF4',
-    date: 'Sep 15, 2023',
-    author: 'Sarah Jenkins',
-    isCurrent: false,
-    changes: [
-      'Initial headless architecture proposal',
-      'Defined 45 tax jurisdiction requirements',
-    ],
-  },
-];
+function formatDate(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
+function statusBadgeStyle(status: string, c: any, colors: any) {
+  switch (status) {
+    case 'PROCESSING':
+      return { bg: c.processingBg, text: colors.processing, border: colors.processing + '40' };
+    case 'COMPLETED':
+      return { bg: c.reviewedBg, text: colors.success, border: colors.success + '40' };
+    case 'REVIEWED':
+      return { bg: c.processingBg, text: colors.primary, border: colors.primary + '40' };
+    case 'FAILED':
+      return { bg: c.dangerBg, text: colors.danger, border: colors.danger + '40' };
+    default:
+      return { bg: c.pendingBg, text: colors.warning, border: colors.warning + '40' };
+  }
+}
 
 export default function VersionHistoryScreen() {
   const router = useRouter();
+  const { mainId, versionId, name } = useLocalSearchParams<{
+    mainId: string;
+    versionId: string;
+    name: string;
+  }>();
+  const { c, colors } = useTheme();
+
+  const [versions, setVersions] = useState<SpecVersion[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const specName = (name as string) || 'Specification';
+
+  const fetchVersions = useCallback(async () => {
+    if (!mainId) {
+      setError('Missing specification ID');
+      return;
+    }
+    try {
+      setError(null);
+      const data = await getSpecVersions(mainId, versionId);
+
+      if (data && data.length > 0) {
+        const sortedData = [...data].sort((a, b) => {
+          const vA = parseInt(String(a.version).replace(/\D/g, '')) || 0;
+          const vB = parseInt(String(b.version).replace(/\D/g, '')) || 0;
+          return vB - vA;
+        });
+        setVersions(sortedData);
+      } else {
+        setVersions([]);
+      }
+    } catch (err: any) {
+      const message =
+        err?.response?.data?.message ||
+        err?.message ||
+        'ไม่สามารถโหลดข้อมูลได้ กรุณาลองใหม่อีกครั้ง';
+      setError(message);
+    }
+  }, [mainId]);
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      await fetchVersions();
+      setLoading(false);
+    })();
+  }, [fetchVersions]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchVersions();
+    setRefreshing(false);
+  }, [fetchVersions]);
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
-      <View className="flex-row items-center px-4 py-4 border-b border-gray-100 bg-white">
+    <SafeAreaView className="flex-1" style={{ backgroundColor: c.background }}>
+
+      <View className="flex-row items-center px-4 py-4 border-b" style={{ borderColor: c.border, backgroundColor: c.background }}>
         <TouchableOpacity onPress={() => router.back()} className="p-2 mr-2">
-          <ChevronLeft color="#374151" size={24} />
+          <ChevronLeft color={c.textPrimary} size={24} />
         </TouchableOpacity>
-        <Text className="text-lg font-bold text-gray-900 flex-1">Version History</Text>
+        <View className="flex-1">
+          <Text className="text-lg font-bold" numberOfLines={1} style={{ color: c.textPrimary }}>
+            Version History
+          </Text>
+          <Text className="text-xs" numberOfLines={1} style={{ color: c.textSecondary }}>
+            {specName}
+          </Text>
+        </View>
       </View>
 
-      <ScrollView
-        className="flex-1 px-6 pt-6"
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 60 }}
-      >
-        <Text className="text-sm text-gray-500 mb-6">
-          E-Commerce Platform Requirements · {versions.length} versions
-        </Text>
+      {loading && (
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text className="text-sm mt-3" style={{ color: c.textSecondary }}>Loading versions…</Text>
+        </View>
+      )}
 
-        {versions.map((v, index) => (
-          <View key={index} className="flex-row mb-0">
-            <View className="items-center mr-4">
-              <View className={`w-8 h-8 rounded-full items-center justify-center ${v.isCurrent ? 'bg-blue-600' : 'bg-gray-100'}`}>
-                {v.isCurrent
-                  ? <Clock color="white" size={15} />
-                  : <CheckCircle2 color="#9CA3AF" size={15} />
-                }
-              </View>
-              {index < versions.length - 1 && (
-                <View className="w-0.5 bg-gray-200 flex-1 my-1" style={{ minHeight: 28 }} />
-              )}
+      {!loading && error && (
+        <View className="flex-1 items-center justify-center px-8">
+          <AlertTriangle color={colors.danger} size={40} />
+          <Text className="text-sm font-semibold mt-3 mb-1" style={{ color: colors.danger }}>Error Loading Data</Text>
+          <Text className="text-xs text-center mb-4" style={{ color: c.textSecondary }}>{error}</Text>
+          <TouchableOpacity
+            onPress={onRefresh}
+            className="px-6 py-2 rounded-xl"
+            style={{ backgroundColor: colors.danger }}
+          >
+            <Text className="text-xs font-bold" style={{ color: colors.white }}>Try Again</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {!loading && !error && (
+        <ScrollView
+          className="flex-1 px-6 pt-6"
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 60 }}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
+        >
+
+          <Text className="text-sm mb-6" style={{ color: c.textSecondary }}>
+            {specName} · {versions.length} version{versions.length !== 1 ? 's' : ''}
+          </Text>
+
+          {versions.length === 0 && (
+            <View className="py-16 items-center">
+              <Clock color={c.border} size={40} />
+              <Text className="text-sm mt-3" style={{ color: c.textSecondary }}>No versions found</Text>
             </View>
+          )}
 
-            <View className={`flex-1 mb-5 rounded-2xl border p-4 ${v.isCurrent ? 'border-blue-200 bg-blue-50' : 'border-gray-100 bg-white'} shadow-sm`}>
-              <View className="flex-row justify-between items-center mb-2">
-                <Text className={`text-[15px] font-bold ${v.isCurrent ? 'text-blue-700' : 'text-gray-900'}`}>
-                  {v.version}
-                  {v.isCurrent && <Text className="text-[12px] font-semibold text-blue-400"> · Current</Text>}
-                </Text>
-                <View className="rounded-full px-3 py-1 border" style={{ backgroundColor: v.labelBg, borderColor: v.labelColor + '40' }}>
-                  <Text style={{ color: v.labelColor }} className="text-[11px] font-bold">{v.label}</Text>
-                </View>
-              </View>
+          {versions.map((v, index) => {
+            const isLatest = index === 0;
+            const isViewing = v.id === versionId;
+            return (
+              <View key={v.id || index} className="flex-row mb-0">
 
-              <View className="flex-row items-center gap-x-3 mb-3">
-                <View className="flex-row items-center gap-x-1">
-                  <User color="#9CA3AF" size={12} />
-                  <Text className="text-xs text-gray-500">{v.author}</Text>
-                </View>
-                <View className="flex-row items-center gap-x-1">
-                  <Clock color="#9CA3AF" size={12} />
-                  <Text className="text-xs text-gray-500">{v.date}</Text>
-                </View>
-              </View>
-
-              <View className="space-y-1 mb-4">
-                {v.changes.map((change, ci) => (
-                  <View key={ci} className="flex-row items-start gap-x-2">
-                    <GitCommit color="#6B7280" size={12} style={{ marginTop: 2 }} />
-                    <Text className="text-[12px] text-gray-600 flex-1 leading-tight">{change}</Text>
+                <View className="items-center mr-4">
+                  <View
+                    className="w-8 h-8 rounded-full items-center justify-center"
+                    style={{ backgroundColor: isLatest ? colors.processing : c.sectionBg }}
+                  >
+                    {isLatest
+                      ? <Clock color={colors.white} size={15} />
+                      : <CheckCircle2 color={c.textSecondary} size={15} />
+                    }
                   </View>
-                ))}
-              </View>
+                  {index < versions.length - 1 && (
+                    <View className="w-0.5 flex-1 my-1" style={{ backgroundColor: c.border, minHeight: 28 }} />
+                  )}
+                </View>
 
-              <TouchableOpacity
-                className={`flex-row items-center justify-center gap-x-2 py-2 rounded-xl border ${v.isCurrent
-                    ? 'border-blue-300 bg-blue-100'
-                    : 'border-gray-200 bg-gray-50'
-                  }`}
-              >
-                <Eye color={v.isCurrent ? '#3B82F6' : '#6B7280'} size={14} />
-                <Text className={`text-[13px] font-semibold ${v.isCurrent ? 'text-blue-600' : 'text-gray-600'
-                  }`}>
-                  {v.isCurrent ? 'Viewing Current' : 'View'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        ))}
-      </ScrollView>
+                <View
+                  className="flex-1 mb-5 rounded-2xl border p-4 shadow-sm"
+                  style={{
+                    backgroundColor: isLatest ? c.processingBg : c.card,
+                    borderColor: isLatest ? colors.processing + '40' : c.border,
+                  }}
+                >
+                  <View className="flex-row justify-between items-center mb-3">
+                    <Text className="text-[15px] font-bold" style={{ color: isLatest ? colors.processing : c.textPrimary }}>
+                      {v.version ? `Version ${v.version}` : `Version ${index + 1}`}
+                      {isLatest && (
+                        <Text className="text-[12px] font-semibold" style={{ color: colors.processing }}>
+                          {' '}· Current
+                        </Text>
+                      )}
+                    </Text>
+                  </View>
+
+                  <View className="flex-row items-center gap-x-3 mb-3">
+                    <View className="flex-row items-center gap-x-1">
+                      <Clock color={c.textSecondary} size={12} />
+                      <Text className="text-xs" style={{ color: c.textSecondary }}>
+                        {formatDate(v.createdAt || v.updatedAt)}
+                      </Text>
+                    </View>
+                    {v.language && (
+                      <View className="flex-row items-center gap-x-1">
+                        <Globe color={c.textSecondary} size={12} />
+                        <View className="rounded-full px-2 py-0.5" style={{ backgroundColor: c.sectionBg }}>
+                          <Text className="text-[10px] font-bold" style={{ color: c.textSecondary }}>
+                            {v.language}
+                          </Text>
+                        </View>
+                      </View>
+                    )}
+                  </View>
+
+                  <TouchableOpacity
+                    onPress={() => {
+                      if (isViewing) {
+                        router.back();
+                      } else {
+                        router.push({
+                          pathname: '/details' as any,
+                          params: { mainId, versionId: v.id, name: specName }
+                        });
+                      }
+                    }}
+                    className="flex-row items-center justify-center gap-x-2 py-2 rounded-xl border"
+                    style={{
+                      backgroundColor: isViewing ? colors.processing + '20' : c.sectionBg,
+                      borderColor: isViewing ? colors.processing + '60' : c.border,
+                    }}
+                  >
+                    <Eye color={isViewing ? colors.processing : c.textSecondary} size={14} />
+                    <Text className="text-[13px] font-semibold" style={{ color: isViewing ? colors.processing : c.textSecondary }}>
+                      {isViewing ? 'Viewing' : 'View'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            );
+          })}
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 }

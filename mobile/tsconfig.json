@@ -3,7 +3,11 @@
   "compilerOptions": {
     "strict": true,
     "jsx": "react-native",
-    "allowSyntheticDefaultImports": true
+    "allowSyntheticDefaultImports": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./*"]
+    }
   },
   "include": [
     "**/*.ts",
