@@ -1,5 +1,10 @@
 {
-  "dependencies": {
-    "axios": "^1.15.2"
+  "name": "spec-app",
+  "private": true,
+  "workspaces": [
+    "packages/schemas"
+  ],
+  "scripts": {
+    "build:schemas": "npm run build -w @spec-app/schemas"
   }
 }

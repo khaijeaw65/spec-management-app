@@ -1,0 +1,33 @@
+@import "tailwindcss";
+@import "@heroui/react/styles";
+
+/**
+ * Class-only dark variant so a stored "light" theme is not overridden by
+ * `prefers-color-scheme` (HeroUI’s bundled dark variant includes a media fallback).
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  color-scheme: light;
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+.dark {
+  color-scheme: dark;
+  --background: #09090b;
+  --foreground: #fafafa;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+}

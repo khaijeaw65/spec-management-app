@@ -1,0 +1,649 @@
+## Role
+You are a frontend developer working on a Next.js application called SpecBuilder.
+Focus on UI implementation only. Do not suggest changes to backend logic or shared schemas.
+
+---
+
+## Project Overview
+SpecBuilder is a workflow-based AI tool that converts Minutes of Meeting (MOM)
+into structured specification documents.
+Target users: Business Analysts (BA) and Project Managers (PM).
+Not a chat AI — AI is only called in controlled workflow steps.
+
+---
+
+## Tech Stack
+- Framework:     Next.js 16.2 (App Router)
+- Language:      TypeScript (strict, no `any`)
+- Styling:       Tailwind CSS v4
+- UI Library:    HeroUI (@heroui/react) — https://www.heroui.com
+- Forms:         react-hook-form + @hookform/resolvers/zod
+- Validation:    Zod schemas from @spec-app/schemas ONLY — never write schemas here
+- Icons:         lucide-react
+- DnD:           @dnd-kit/core + @dnd-kit/sortable (template section reordering)
+- Data fetching: TanStack React Query v5 + axios
+- HTTP client:   axios with global instance from src/lib/axios.ts
+
+---
+
+## Next.js 16 Specific Rules
+- Turbopack is now the default bundler — do not add --turbopack flags, it runs automatically
+- middleware.ts is DEPRECATED — use proxy.ts with exported function named `proxy` instead
+- React Compiler is stable — do not manually add useMemo/useCallback unless truly necessary,
+  the compiler handles memoization automatically
+- `use cache` directive replaces PPR — use this for caching components/functions if needed
+- App Router conventions apply — server components by default, `use client` only when needed
+
+---
+
+## Monorepo Context
+```
+spec-app/
+  backend/
+  frontend/         ← this app
+  mobile/
+  packages/
+    schemas/        ← shared Zod schemas (@spec-app/schemas)
+```
+Always import types and schemas from `@spec-app/schemas`.
+Never duplicate types that already exist as inferred types from those schemas.
+
+---
+
+## Axios Setup
+Global axios instance in `src/lib/axios.ts`:
+```typescript
+import axios from 'axios';
+
+const api = axios.create({
+  baseURL: process.env.NEXT_PUBLIC_API_URL,
+  headers: { 'Content-Type': 'application/json' },
+});
+
+// attach JWT token from localStorage on every request
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('access_token');
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
+// handle 401 globally — redirect to login
+api.interceptors.response.use(
+  (res) => res,
+  (error) => {
+    if (error.response?.status === 401) {
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
+
+export default api;
+```
+
+Always import `api` from `src/lib/axios.ts` — never use raw `axios` directly in services.
+
+## React Query Setup
+QueryClient in `src/lib/query-client.ts`:
+```typescript
+import { QueryClient } from '@tanstack/react-query';
+
+export const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 30,   // 30 seconds
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
+```
+
+Wrap app in QueryClientProvider in `src/app/providers.tsx` (client component).
+
+## Service Pattern (after demo wiring)
+Services use axios and return typed data — React Query handles caching:
+```typescript
+// src/services/spec.service.ts
+import api from '@/lib/axios';
+import type { SpecDto } from '@spec-app/schemas';
+
+export const specService = {
+  getList: async (): Promise<SpecDto[]> => {
+    const res = await api.get('/specs');
+    return res.data.data;
+  },
+
+  getById: async (id: string): Promise<SpecDto> => {
+    const res = await api.get(`/specs/${id}`);
+    return res.data.data;
+  },
+};
+```
+
+## Polling with React Query
+Use `refetchInterval` for PENDING/PROCESSING specs:
+```typescript
+useQuery({
+  queryKey: ['spec', id],
+  queryFn: () => specService.getById(id),
+  refetchInterval: (query) => {
+    const status = query.state.data?.status;
+    return status === 'PENDING' || status === 'PROCESSING' ? 4000 : false;
+  },
+});
+```
+
+---
+
+## Current Mode: UI DEMO ONLY
+- No real API calls — all data comes from mock files in `src/mocks/`
+- Mock functions simulate async with 300-500ms delay using `delay()` helper
+- All mock functions return `Promise<ApiResponse<T>>`
+- Service files exist as shells with `// TODO: replace with real API call`
+- Use realistic mock data — no "string", "test", "lorem ipsum"
+- API wiring happens after demo
+
+---
+
+## API Response Type
+Define once in `src/types/api.types.ts`:
+```typescript
+export interface ApiResponse<T> {
+  status: number;
+  message: string;
+  data: T;
+}
+```
+
+---
+
+## App Router Structure
+```
+src/
+  app/
+    (auth)/
+      login/
+        page.tsx
+    (dashboard)/
+      layout.tsx              ← sidebar layout wrapper
+      dashboard/
+        page.tsx
+      specifications/
+        page.tsx
+        [id]/
+          page.tsx
+        create/
+          page.tsx
+      templates/
+        page.tsx
+        create/
+          page.tsx
+        [id]/
+          edit/
+            page.tsx
+    providers.tsx             ← QueryClientProvider + HeroUIProvider wrapper
+  components/
+    layout/
+      sidebar.tsx
+      topbar.tsx
+    ui/                       ← shared reusable components
+    specs/                    ← spec-specific components
+    templates/                ← template-specific components
+  mocks/
+    auth.mock.ts
+    spec.mock.ts
+    template.mock.ts
+  services/                   ← empty shells, TODO comments only
+    auth.service.ts
+    spec.service.ts
+    template.service.ts
+  types/
+    api.types.ts
+  lib/
+    axios.ts                  ← global axios instance
+    query-client.ts           ← QueryClient config
+    mock-utils.ts
+    utils.ts
+```
+
+---
+
+## Routing
+- `/` → redirect to `/dashboard`
+- Auth: hardcoded redirect for demo, no real session check
+- Add next-auth after demo — do not wire it now
+- All protected pages live under `(dashboard)` route group
+- Do NOT use middleware.ts — use proxy.ts if request interception is needed
+
+---
+
+## Dark Mode
+- Supported via HeroUI + Tailwind CSS v4
+- Toggle lives in sidebar bottom section
+- Use HeroUI's `useTheme` hook to toggle between light/dark
+- Persist preference in localStorage key: `theme`
+- Default: system preference via `prefers-color-scheme`
+- Apply `dark` class on `<html>` element
+- All components must support both light and dark — use Tailwind dark: variants
+- Never hardcode light-only colors — always pair with dark: equivalent
+
+### Dark Mode Color Mapping
+```
+Light                          Dark
+zinc-50  (content bg)     →   zinc-950
+white    (card bg)         →   zinc-900
+zinc-200 (border)          →   zinc-700
+zinc-900 (sidebar)         →   zinc-950  (slightly darker)
+zinc-800 (sidebar active)  →   zinc-800  (same)
+```
+
+---
+
+## Design System
+
+### Overall Feel
+- Working tool aesthetic — think Linear, Vercel dashboard, not a SaaS marketing page
+- Compact density — tighter spacing, less padding than typical marketing designs
+- Strong typographic hierarchy
+- Functional over decorative — reduce icons and decorative elements
+- Supports light and dark mode
+
+### Layout
+- Sidebar: fixed left, 240px wide, dark (`zinc-900` light / `zinc-950` dark)
+- Content area: fills remaining width, `zinc-50` light / `zinc-950` dark
+- Topbar: inside content area, white/zinc-900 bg, border-bottom, 64px tall
+- Page content: padded container, 24px padding
+
+### Sidebar Structure
+```
+Top:
+  [SpecBuilder logo + icon]
+
+Navigation:
+  - Dashboard         (LayoutDashboard icon)
+  - Specifications    (FileText icon)
+  - Templates         (Layout icon)
+
+Bottom:
+  - Theme toggle      (Sun/Moon icon)
+  - User avatar + name
+  - Logout button
+```
+
+Sidebar item states:
+- Inactive: zinc-400 text, transparent bg
+- Active:   white text, zinc-800 bg, rounded-md
+- Hover:    zinc-700 bg
+
+### Color Palette
+- Sidebar bg:        zinc-900 / dark:zinc-950
+- Sidebar text:      zinc-400 (inactive), white (active)
+- Sidebar active:    zinc-800
+- Content bg:        zinc-50 / dark:zinc-950
+- Card bg:           white / dark:zinc-900
+- Border:            zinc-200 / dark:zinc-700
+- Primary:           blue-600
+- Danger:            red-500
+- Success:           green-600
+- Warning:           amber-500
+- Processing:        blue-500
+
+### Status Badge Colors
+- PENDING     → gray badge + Clock icon
+- PROCESSING  → blue badge + animated Loader2 spinner icon
+- COMPLETED   → green badge
+- REVIEWED    → green badge + CheckCircle icon
+- FAILED      → red badge + AlertCircle icon
+
+NOTE: There is NO EXPORTED status — export is tracked by exportedOn timestamp only.
+A spec can be exported regardless of its current status (COMPLETED or REVIEWED).
+
+### Risk Priority Badge Colors
+- HIGH    → red badge
+- MEDIUM  → amber badge
+- LOW     → green badge
+
+---
+
+## Mock Helpers (`src/lib/mock-utils.ts`)
+```typescript
+export const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
+
+export function mockResponse<T>(data: T, status = 200): ApiResponse<T> {
+  return { status, message: 'success', data };
+}
+```
+
+---
+
+## Mock Data Scale
+- 5-6 mock specs with mixed statuses: PENDING, PROCESSING, COMPLETED, REVIEWED, FAILED
+  NOTE: No EXPORTED status in mock data
+- 4 mock templates: Standard Template, Mobile App Template, API Template, UI/UX Template
+  - Mix of English and Thai — at least 1 Thai template
+  - Each with realistic section titles and descriptions
+- 1 spec with 3 versions (demo version history tab)
+- 1 spec with 3-4 risks (demo ambiguities tab)
+  - Each risk must include: priority (HIGH|MEDIUM|LOW), type, related section name, detail, referenceText (MOM quote)
+- Realistic names, dates, content — not placeholder text
+
+---
+
+## Page Specifications
+
+### Login (`/login`)
+- Centered card layout, full screen
+- SpecBuilder logo + name at top of card
+- Email + password fields using react-hook-form + zodResolver
+  with LoginSchema from @spec-app/schemas
+- "Sign In" button (full width)
+- On submit: mock login 500ms delay → redirect to /dashboard
+- No register link (admin creates users externally)
+
+---
+
+### Dashboard (`/dashboard`)
+Sections top to bottom:
+
+1. Page header
+   - Title: "Specification Management"
+   - Subtitle: "Transform meeting notes into structured, unambiguous project specifications"
+   - "+ Create Specification" button → /specifications/create
+
+2. Stats row — 4 compact stat cards:
+   - My Specifications (total count, document icon)
+   - Reviewed (count, green check icon)
+   - Processing (count, blue spinner icon if > 0)
+   - Failed (count, red alert icon if > 0, red text)
+
+3. Workflow steps — compact horizontal stepper (visual only, not clickable):
+   - Step 1: Import MOM
+   - Step 2: Select Template
+   - Step 3: Generate Spec
+   - Step 4: Review
+   Connected by arrows, numbered circles
+
+4. Recent Activity — last 5 specs as list rows:
+   - Document icon + title + template info (muted)
+   - Status badge
+   - Relative time (e.g. "2 hours ago")
+   - Click row → /specifications/[id]
+
+DO NOT include:
+- Available Templates section
+- "Ready to Create Your First Specification?" hero section
+- Getting Started tab
+
+---
+
+### Specifications List (`/specifications`)
+
+- Page header: "Specifications" + subtitle + "+ New Spec" button → /specifications/create
+- Search input: "Search by title or template..."
+- Filters row: Status dropdown | Language dropdown | Sort By dropdown
+- Count: "Showing X of Y specifications"
+
+Each spec row:
+- Document icon
+- Title (bold) + subtitle: "[Template] • v[N] • [N] sections"
+- Description (muted, if exists)
+- Language badge
+- Status badge (with spinner for PENDING and PROCESSING)
+- Date
+- ⋮ menu:
+  - View → /specifications/[id]
+  - Regenerate (confirmation modal)
+  - Mark as Reviewed (only if COMPLETED, not already REVIEWED)
+
+PENDING + PROCESSING behavior:
+- Both badges show spinner
+- Poll every 4 seconds (mock: useEffect interval)
+- On COMPLETED: show toast "✓ [name] is ready to review"
+- Clear interval when status is no longer PENDING or PROCESSING
+
+Empty state:
+- Icon + "No specifications yet"
+- "Create your first specification to get started"
+- "+ Create Specification" button
+
+---
+
+### Create Specification (`/specifications/create`)
+2-step wizard only — NOT 4 steps.
+
+Progress bar: Step 1 → Step 2, checkmark on completed step.
+
+**Step 1 — Meeting Notes:**
+- Card title: "Paste Your Meeting Notes"
+- Subtitle: "Copy and paste the minutes of meeting (MOM) from your recent discussion."
+
+Two input methods (tabs or toggle):
+
+  Option A — Type/Paste (default tab):
+  - Textarea: label "Meeting Notes (MOM)", min 50 characters
+  - Info tip: "Tip: Include as much detail as possible about requirements,
+    stakeholders, timelines, and any special considerations."
+
+  Option B — Upload File:
+  - Drag and drop area or click to browse
+  - Accepted formats: .txt, .docx, .pdf
+  - Shows filename + file size after selection
+  - Read-only — no text extraction for demo
+  - Note: "File will be processed on the server"
+  - Backend contract (for future wiring):
+    - Text paste  → JSON:           { momContent: string, templateId, language }
+    - File upload → multipart/form: { file, templateId, language }
+
+- Button: "Next: Select Template →" (disabled until input is valid)
+
+**Step 2 — Select Template & Language:**
+- Card title: "Select Template & Language"
+- Spec name input: required, placeholder "e.g. Payment Gateway Integration"
+- Spec description input: optional, placeholder "Brief description of this specification"
+- Template grid (2×2): Standard, Mobile App, API, UI/UX
+  - Each card: name, short description, section count
+  - Selected state: blue border + blue check badge
+- Language:
+  - Radio: English / Thai (ไทย)
+  - Note: "Changing language later will require generating a new version"
+- Buttons: "← Back" | "Generate Specification →"
+
+**On submit:**
+- Create mock spec status: PENDING → then PROCESSING
+- Redirect immediately to /specifications
+- Spec at top of list with PROCESSING badge + spinner
+- After 5 seconds: status → COMPLETED
+- Toast: "✓ [spec name] is ready to review"
+
+---
+
+### Specification Detail (`/specifications/[id]`)
+
+**Header:**
+- "← Back to Specifications"
+- Title (large bold) + description (muted, if exists)
+- Badges: Status + Language + Version (e.g. "v2")
+- Right: ⋮ menu + "Export PDF" button (blue, enabled only for COMPLETED or REVIEWED)
+
+**⋮ menu:**
+- Mark as Reviewed (only if COMPLETED, not already REVIEWED)
+  - Confirmation modal:
+    "Marking as reviewed indicates this spec has been checked —
+    not that it is final or approved. Continue?"
+  - On confirm: update status locally
+- Regenerate → opens regenerate confirmation modal
+
+**Regenerate modal:**
+- Default: "This will create a new version. Previous versions remain viewable."
+- If language changed, add warning:
+  "Changing language may affect:
+   • Word and terminology choices
+   • Content structure
+   • Ambiguity detection results"
+- Buttons: Cancel | Confirm
+
+**Export PDF:**
+- Enabled only when status is COMPLETED or REVIEWED
+- On click: toast "Exporting PDF..."
+- After 1 second: toast "PDF exported successfully"
+- No actual file generation for demo
+- No status change on export — exportedOn is tracked server-side only
+
+**Metadata row (card):**
+- Template | Created By | Created Date | Last Modified
+
+**Original MOM — collapsible section** (below metadata, collapsed by default):
+- Toggle: "View Original Meeting Notes (MOM)" + ChevronDown icon
+- Expands to: scrollable read-only box, monospace font, max-height 200px
+- No edit controls
+
+**3 tabs:**
+
+Tab 1 — Specification:
+- Section cards in template order
+- Each card: "[N]. Section Title" (bold) + content paragraph
+- Empty content → italic muted: "Not mentioned in the provided information (MOM)"
+
+Tab 2 — Ambiguities & Risks:
+- Summary: "Found X potential ambiguities or risks. Please review and clarify."
+- Each risk card:
+  - Priority badge: High (red) | Medium (amber) | Low (green)  ← AI-determined
+  - Type badge: e.g. "Ambiguous Language", "Unclear Scope", "Missing Timeline"
+  - Related section name (muted, e.g. "→ User Requirements") — null if spec-level risk
+  - Detail text (bold)
+  - MOM reference quote (italic muted, in quotation marks) — if referenceText exists
+- NO "Mark as Resolved" button
+- NO "Add Note" button
+- Empty state: green CheckCircle + "No ambiguities or risks detected"
+
+Tab 3 — Versions:
+- Title: "Version History"
+- Each row:
+  - "Version X" + "Current" badge on latest COMPLETED/REVIEWED version
+  - Date + short description
+  - "View" button
+- NO "Restore" button
+
+**Page states:**
+- PENDING:    HeroUI Skeleton + banner "Your specification is queued for generation..."
+- PROCESSING: HeroUI Skeleton + banner "Your specification is being generated..."
+- FAILED:     red banner "Generation failed. Please try regenerating." + Regenerate button
+- COMPLETED / REVIEWED: full content
+
+---
+
+### Templates List (`/templates`)
+
+- Page header: "Templates" + "+ New Template" button → /templates/create
+- Grid (2 columns) of template cards:
+  - Template name (bold)
+  - Language badge
+  - Section count
+  - Created date
+  - ⋮ menu:
+    - Edit → /templates/[id]/edit
+    - Delete → confirmation modal "Are you sure? This cannot be undone."
+    - On confirm: remove from local state + success toast
+
+Empty state:
+- Icon + "No templates yet"
+- "Create your first template to get started"
+- "+ New Template" button
+
+---
+
+### Create Template (`/templates/create`)
+### Edit Template (`/templates/[id]/edit`)
+Same component, two modes.
+
+**Header:**
+- "← Back to Templates"
+- Title: "Create Template" or "Edit Template"
+
+**Fields:**
+- Template Name: text input, required
+- Language: radio English | Thai (ไทย)
+  - DISABLED on edit mode
+  - Tooltip: "Language cannot be changed after creation"
+
+**Sections:**
+- Each row:
+  - GripVertical icon (drag handle, cursor-grab)
+  - Section number (auto-calculated, read-only)
+  - Title input (required, placeholder "Section title")
+  - Description textarea (required, placeholder "Describe what AI should
+    extract for this section — used as guidance for AI generation")
+  - Trash icon delete button
+    - Disabled when only 1 section remains
+    - Tooltip: "Template must have at least one section"
+- Drag to reorder via @dnd-kit/sortable
+- "+ Add Section" button below list
+
+**Actions:**
+- "Cancel" → /templates
+- "Save Template" → 300ms mock delay → /templates + success toast
+
+**Validation (inline errors on submit):**
+- Template name required
+- At least 1 section
+- Each section: title + description required
+
+---
+
+## Component Rules
+- Server components by default
+- `'use client'` only for: forms, interactive state, polling, DnD, theme toggle
+- Forms: react-hook-form + zodResolver always
+- Never write inline Zod schemas — import from @spec-app/schemas
+- Never use `any`
+- Use `import type` for type-only imports in decorated contexts
+- Do NOT manually add useMemo/useCallback — React Compiler handles this
+- Always support both light and dark variants on every component
+
+---
+
+## Loading & Empty States
+Every data page must handle:
+- Loading: HeroUI Skeleton components
+- Empty: icon + message + CTA button
+- Error: error message + retry/action button
+
+---
+
+## State Management
+- Local useState for all UI state
+- No global store needed for demo
+- Polling: useEffect + setInterval for demo, React Query refetchInterval after wiring
+- Poll for both PENDING and PROCESSING statuses
+- Toast: HeroUI addToast
+- Theme: localStorage key `theme`, applied as `dark` class on `<html>`
+
+---
+
+## What NOT To Do
+- Do not write Zod schemas — always import from @spec-app/schemas
+- Do not make real API calls — use mock functions only (until after demo)
+- Do not use raw axios — always use the global api instance from src/lib/axios.ts
+- Do not add authentication logic — hardcoded redirect for demo
+- Do not use pages/ router — App Router only
+- Do not use `any` in TypeScript
+- Do not use middleware.ts — deprecated in Next.js 16, use proxy.ts
+- Do not add --turbopack flag — it runs by default in Next.js 16
+- Do not manually add useMemo/useCallback — React Compiler handles memoization
+- Do not add "Mark as Resolved" or "Add Note" to risk cards
+- Do not add "Restore" button to version history
+- Do not use a top navbar — sidebar only
+- Do not include Available Templates section on dashboard
+- Do not include hero/CTA section on dashboard
+- Do not use a 4-step wizard — 2 steps only
+- Do not add username field — email only
+- Do not generate actual PDF — toast only for demo
+- Do not allow language change on template edit mode
+- Do not allow deleting the last remaining section of a template
+- Do not extract text from uploaded files on frontend — backend handles extraction
+- Do not add EXPORTED as a status badge — no such status exists
+- Do not disable Export PDF button based on exported status — use COMPLETED/REVIEWED check only
+- Do not show spec description as empty string — only show if it exists
+- Do not hardcode light-only colors — always pair with dark: variant
+- Do not use NEXT_PUBLIC_ env vars for sensitive data — baseURL only

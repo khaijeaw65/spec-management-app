@@ -222,27 +222,29 @@ export default function SpecificationsScreen() {
         }
       >
 
-        <View className="mb-4">
-          <View
-            className="flex-row items-center border rounded-xl px-3 h-11"
-            style={{ backgroundColor: c.card, borderColor: c.border }}
-          >
-            <Search color={c.textSecondary} size={16} />
-            <TextInput
-              placeholder="Search specifications…"
-              placeholderTextColor={c.textSecondary}
-              className="flex-1 ml-2 text-sm"
-              style={{ color: c.textPrimary }}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            {searchQuery.length > 0 && (
-              <TouchableOpacity onPress={() => setSearchQuery('')}>
-                <X color={c.textSecondary} size={16} />
-              </TouchableOpacity>
-            )}
+        <View className="mb-6">
+          <Text className="text-2xl font-bold text-gray-900 mb-1">Welcome back, Alex</Text>
+          <Text className="text-sm text-gray-500">You have 3 documents awaiting review.</Text>
+        </View>
+
+
+        <View className="flex-row justify-between mb-8 gap-x-3">
+          <View className="flex-1 bg-white border border-gray-200 rounded-2xl py-4 items-center shadow-sm">
+            <FileText color="#3B82F6" size={20} className="mb-2" />
+            <Text className="text-xl font-bold text-gray-900">24</Text>
+            <Text className="text-[10px] font-bold text-gray-500 mt-1">TOTAL</Text>
+          </View>
+
+          <View className="flex-1 bg-white border border-gray-200 rounded-2xl py-4 items-center shadow-sm">
+            <AlertCircle color="#4B5563" size={20} className="mb-2" />
+            <Text className="text-xl font-bold text-gray-900">8</Text>
+            <Text className="text-[10px] font-bold text-gray-500 mt-1">PROCESSING</Text>
+          </View>
+
+          <View className="flex-1 bg-white border border-gray-200 rounded-2xl py-4 items-center shadow-sm">
+            <CheckCircle2 color="#4B5563" size={20} className="mb-2" />
+            <Text className="text-xl font-bold text-gray-900">16</Text>
+            <Text className="text-[10px] font-bold text-gray-500 mt-1">REVIEWED</Text>
           </View>
         </View>
 
