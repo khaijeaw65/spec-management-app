@@ -30,6 +30,7 @@ export class UserRepository implements IUserRepository {
         id: true,
         firstName: true,
         lastName: true,
+        email: true,
         isActive: true,
         password: true,
       },

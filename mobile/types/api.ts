@@ -41,8 +41,9 @@ export interface SpecificationListResponse {
 }
 
 export interface SpecSection {
+  id: string;
   title: string;
-  content: string;
+  detail: string;
 }
 
 export interface SpecRisk {
@@ -54,30 +55,8 @@ export interface SpecRisk {
   referenceText?: string;
 }
 
-export interface SpecDetail {
-  id: string;
-  mainId: string;
-  name: string;
-  version: string;
-  status: SpecStatus;
-  language: SpecLanguage;
-  sections: SpecSection[];
-  risks: SpecRisk[];
-  createdAt: string;
-  updatedAt: string;
-}
-
 export interface SpecDetailResponse {
   data: SpecDetail;
-}
-
-export interface SpecVersion {
-  id: string;
-  version: string;
-  status: SpecStatus;
-  language: SpecLanguage;
-  createdAt: string;
-  updatedAt: string;
 }
 
 export interface SpecVersionListResponse {

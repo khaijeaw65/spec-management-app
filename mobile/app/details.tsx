@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
   Platform, ActivityIndicator, RefreshControl,
-} from 'react-native';
+ Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
@@ -12,7 +12,6 @@ import {
 import { useTheme } from '@/hooks/useAppTheme';
 import { getSpecDetail, markAsReviewed } from '@/services/api';
 import type { SpecDetail, SpecRisk } from '@/types/api';
-import { Alert } from 'react-native';
 
 function statusColor(status: string, colors: any) {
   switch (status) {
@@ -75,8 +74,10 @@ export default function DetailsScreen() {
     try {
       setError(null);
       const data = await getSpecDetail(mainId, versionId);
+      console.log('data', data);
       setDetail(data);
     } catch (err: any) {
+      console.log(err);
       const message =
         err?.response?.data?.message ||
         err?.message ||
@@ -209,12 +210,15 @@ export default function DetailsScreen() {
             {sections.length > 0 ? (
               <View className="space-y-6">
                 {sections.map((section, index) => (
-                  <View key={index}>
+                  <View key={section.id + index}>
                     <Text className="text-[19px] font-bold mb-3" style={{ color: c.textPrimary }}>
                       {section.title}
                     </Text>
-                    <Text className="text-[15px] leading-relaxed" style={{ color: c.textSecondary }}>
-                      {section.content}
+                    <Text
+                      className="text-[15px]"
+                      style={{ color: c.textSecondary, lineHeight: 22 }}
+                    >
+                      {section.detail}
                     </Text>
                   </View>
                 ))}
@@ -247,7 +251,7 @@ export default function DetailsScreen() {
                             <AlertTriangle color={rColor} size={16} />
                           </View>
                           <Text className="text-[15px] font-bold" style={{ color: c.textPrimary }}>
-                            {risk.riskType ? risk.riskType.replace(/_/g, ' ') : "Unknown Risk"}
+                            {risk.riskType ? risk.riskType.replaceAll('_', ' ') : 'Unknown Risk'}
                           </Text>
                         </View>
                         <View className="rounded-full px-2 py-1 border" style={{ backgroundColor: rBg, borderColor: rColor + '40' }}>
@@ -262,7 +266,7 @@ export default function DetailsScreen() {
                       {risk.referenceText ? (
                         <View className="pl-3 border-l-2 py-1" style={{ borderColor: rColor, backgroundColor: rBg, borderTopRightRadius: 6, borderBottomRightRadius: 6, paddingRight: 8 }}>
                           <Text className="text-[12px] italic leading-tight" style={{ color: c.textSecondary }}>
-                            "{risk.referenceText}"
+                            {'"' + risk.referenceText + '"'}
                           </Text>
                         </View>
                       ) : null}
