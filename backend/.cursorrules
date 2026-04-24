@@ -1,0 +1,473 @@
+# ============================================================
+# .cursorrules — Spec App Backend
+# ============================================================
+# This file is read by Cursor before every prompt.
+# Do not remove or rename this file.
+# For AWS resource details (ARNs, IDs) see .cursorrules.local (not committed)
+# ============================================================
+
+## Project Overview
+Specification Clarification Application.
+Workflow-based AI system that converts Minutes of Meeting (MOM)
+into structured specification documents with ambiguity/risk detection.
+Not a chat AI. AI is only called in controlled workflow steps.
+2 developers. Pre-production / university project + talent competition.
+
+## Tech Stack
+- Backend:     NestJS (TypeScript), ports & adapters architecture
+- Database:    PostgreSQL 16, TypeORM
+- Queue:       AWS SQS (async AI generation)
+- AI:          OpenAI API direct (gpt-4o-mini)
+- Storage:     AWS S3 (private bucket)
+- Secrets:     AWS Secrets Manager (injected by ECS at runtime)
+- Frontend:    Vercel (Next.js) — separate repo
+- Mobile:      Review-only app — separate repo
+- CI/CD:       GitHub Actions → ECR → ECS Fargate
+
+## Environment Convention
+- NODE_ENV=local        → developer machine, Docker PG, no SSL
+- NODE_ENV=development  → shared dev server, RDS dev, SSL enabled
+- NODE_ENV=staging      → pre-prod, mirrors production config
+- NODE_ENV=production   → live, RDS prod, SSL enabled
+- SSL enabled when NODE_ENV !== 'local'
+- AWS credentials: explicit only when present (local dev)
+  on ECS task role handles auth automatically — never require credentials
+
+## Project Structure
+backend/
+  src/
+    main.ts                          → HTTP API entry point
+    worker.main.ts                   → SQS worker entry point (no HTTP)
+    app.module.ts                    → root module
+    constant/
+      sql-column.constant.ts         → column type constants
+    entities/
+      base.entity.ts                 → base entity (id + isActive + audit columns)
+      *.entity.ts                    → one file per entity
+    modules/
+      user/
+      template/
+      template-section/              → flat structure, same level as template
+      spec/
+      queue/                         → SQS producer (used by API)
+      worker/                        → SQS consumer (used by worker)
+
+## Entities
+All entities extend BaseEntity from backend/src/entities/base.entity.ts
+BaseEntity contains:
+- id: UUID primary key (@PrimaryGeneratedColumn('uuid'))
+- isActive: boolean, default true
+- createdBy: UUID FK → user.id, nullable
+- createdOn: timestamptz, default NOW()
+- updatedBy: UUID FK → user.id, nullable
+- updatedOn: timestamptz, default NOW()
+- deletedBy: UUID FK → user.id, nullable
+- deletedOn: timestamptz, nullable
+
+Never repeat audit columns on individual entities.
+Never add id column on individual entities.
+Never add isActive on individual entities — inherited from BaseEntity.
+Always import column types from backend/src/constant/sql-column.constant.ts.
+No magic strings for column types anywhere.
+
+AuditLogEntity does NOT extend BaseEntity — it has its own columns only.
+
+Entity files: backend/src/entities/
+- base.entity.ts
+- user.entity.ts
+- language.entity.ts
+- spec-status.entity.ts
+- risk-type.entity.ts
+- main-template.entity.ts
+- template.entity.ts
+- template-section.entity.ts
+- main-generated-spec.entity.ts
+- generated-spec.entity.ts
+- generated-spec-section.entity.ts
+- spec-risk.entity.ts
+- audit-log.entity.ts
+
+NOTE: section-type.entity.ts does NOT exist — section_type table was dropped.
+template_section uses title + description for AI guidance instead.
+
+## Entity: Language
+- code: varchar(10), unique, not null — used by frontend/API (values: 'EN', 'TH')
+- name: varchar(50), unique, not null — display name (values: 'English', 'Thai')
+Frontend always sends code ('EN' or 'TH'), backend resolves to id internally.
+Zod validation: z.enum(['EN', 'TH']) for language input.
+
+## Entity: SpecStatus
+- code: varchar(20), unique, not null — used by app code
+- name: varchar(50), unique, not null — display name
+Values: PROCESSING | COMPLETED | FAILED | REVIEWED
+NOTE: PENDING status was removed — specs start with PROCESSING immediately
+Use SpecStatusCode enum, never magic strings.
+
+## Entity: RiskType
+- code: varchar(50), unique, not null — used by app/AI
+- name: varchar(100), unique, not null — display name
+Values: AMBIGUOUS_LANGUAGE | MISSING_OWNER | NO_TIMELINE | ASSUMED_FACT | UNCLEAR_SCOPE
+Use RiskTypeCode enum, never magic strings.
+
+## Entity: MainTemplate
+- languageId: UUID FK → language.id, not null
+- currentVersion: UUID FK → template.id, nullable
+- Same pointer pattern as MainGeneratedSpec.currentVersion
+- Only updated when a template version is finalized
+- Future-proofed for team sharing feature
+- Never updated on draft/failed template versions
+- Language is fixed at template root level — cannot change after creation
+- Language determines spec output language (no separate language selection on create/regen)
+
+## Entity: TemplateSection
+- title: varchar(255), not null
+- description: TEXT, nullable — used as AI guidance (tells AI what to generate)
+- sortOrder: int, not null, default 0
+- NO sectionTypeId — section_type table was dropped entirely
+
+## Entity: MainGeneratedSpec
+- name: varchar(255), not null — stable across all versions
+- description: TEXT, nullable — optional user-provided description, editable after creation
+- currentVersion: UUID FK → generated_spec.id, nullable — latest COMPLETED version
+- pendingVersion: UUID FK → generated_spec.id, nullable — set on create/regen start, cleared on COMPLETED or FAILED
+
+## Entity: GeneratedSpec
+- version: int, not null, default 1
+- momInputType: varchar(10), not null, default 'TEXT' — 'TEXT' | 'FILE'
+- momS3Key: varchar(500), nullable
+- momS3Bucket: varchar(255), nullable
+- aiModel, promptTokens, completionTokens, totalTokens, generationTimeMs — AI metadata
+- exportedOn: timestamptz, nullable — updated on PDF export, no EXPORTED status
+- templateVersionId: UUID FK → template.id — exact version used at generation time
+
+## Entity: SpecRisk
+- priority: varchar(10), not null — 'HIGH' | 'MEDIUM' | 'LOW' — AI-determined
+- sectionId: nullable FK → generated_spec_section.id
+
+## Entity: AuditLog (does NOT extend BaseEntity)
+- id: UUID PK
+- entity: varchar(100) — entity name e.g. 'GeneratedSpec'
+- entityId: UUID — no FK constraint intentionally
+- action: varchar(20) — 'CREATE' | 'UPDATE' | 'DELETE'
+- changedFields: jsonb, nullable
+- changedBy: UUID FK → user.id, nullable (null for worker operations)
+- changedAt: timestamptz
+
+## Enums
+export enum SpecStatusCode {
+  PROCESSING = 'PROCESSING',
+  COMPLETED = 'COMPLETED',
+  FAILED = 'FAILED',
+  REVIEWED = 'REVIEWED',
+}
+
+export enum RiskTypeCode {
+  AMBIGUOUS_LANGUAGE = 'AMBIGUOUS_LANGUAGE',
+  MISSING_OWNER = 'MISSING_OWNER',
+  NO_TIMELINE = 'NO_TIMELINE',
+  ASSUMED_FACT = 'ASSUMED_FACT',
+  UNCLEAR_SCOPE = 'UNCLEAR_SCOPE',
+}
+
+export enum MomInputType {
+  TEXT = 'TEXT',
+  FILE = 'FILE',
+}
+
+export enum RiskPriority {
+  HIGH = 'HIGH',
+  MEDIUM = 'MEDIUM',
+  LOW = 'LOW',
+}
+
+## TypeORM Rules
+- synchronize: false always, no exceptions
+- No eager: true on any relation
+- Always use @JoinColumn({ name: 'snake_case_column' }) on @ManyToOne side
+- camelCase property names, TypeORM maps to snake_case DB columns automatically
+- nullable FK columns use { nullable: true } in both @Column and @ManyToOne
+- Relations loaded explicitly via relations: {} in queries, never auto-loaded
+- All relations define both sides: @ManyToOne on child, @OneToMany on parent
+- No @Exclude() decorators on entities
+- namingStrategy: SnakeNamingStrategy from typeorm-naming-strategies
+- Always filter isActive: true + deletedOn: IsNull() on active record queries
+- SSL: enabled when NODE_ENV !== 'local' — { rejectUnauthorized: false }
+
+## AWS SDK Credentials Pattern
+- Never require AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY in config validation
+- Make credentials optional in all AWS config services (get not getOrThrow)
+- Only pass credentials to SDK clients when explicitly present:
+  if (accessKeyId && secretAccessKey) { clientConfig.credentials = {...} }
+- On ECS: task role provides credentials automatically via instance metadata
+- On local: credentials from .env used when present
+- Never store AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY in Secrets Manager
+
+## Transaction Management
+- Use @nestjs-cls/transactional + @nestjs-cls/transactional-adapter-typeorm
+- @Transactional() decorator on service methods that span multiple repos
+- ClsPluginTransactional registered in both AppModule and WorkerModule
+- Worker wraps handleMessage in cls.runWith({}) — no HTTP middleware in worker
+- No manual manager passing to repositories
+- FAILED status update always outside transaction — must persist even on rollback
+
+## NestJS Config Pattern
+- ConfigModule.forRoot() in AppModule only — loads .env locally, no-op on ECS
+- ConfigModule.forFeature(registerAs('domain', () => ({...}))) per domain module
+- Each domain has its own ConfigService wrapper class
+- No USE_AWS_SECRET flag
+- No AWS SDK calls at bootstrap
+- All config reads from process.env — source does not matter to the app
+- ECS injects Secrets Manager values into process.env before container starts
+
+registerAs domains:
+- 'database'  → DB_HOST, DB_PORT, DB_USER, DB_PASS, DB_NAME
+- 'openai'    → GEN_AI_API_KEY, GEN_AI_MODEL
+- 'storage'   → STORAGE_PROVIDER, AWS_S3_BUCKET, AWS_S3_REGION
+- 'queue'     → SQS_QUEUE_URL, SQS_REGION
+- 'jwt'       → JWT_ACCESS_TOKEN_SECRET, JWT_REFRESH_TOKEN_SECRET,
+                JWT_ACCESS_TOKEN_EXPIRES_IN, JWT_REFRESH_TOKEN_EXPIRES_IN
+
+## DTO Pattern
+- Zod schemas for all DTOs — inferred types, NOT classes
+- DTOs are plain TypeScript types inferred from Zod schemas
+- Use plain mapper functions (toXxxDto) when mapping entity to response
+- Do NOT use static DTO.from() — DTOs are not classes
+- Controller owns response shape — maps entity to DTO
+- Exception: auth methods (login, refresh) — service returns DTO directly
+- Methods shared with SQS worker return entity, not DTO
+
+## Service / Controller Pattern
+- Never return raw TypeORM entities from controllers
+- Service returns entity/domain object by default
+- Controller calls mapper function to shape response
+- TypeORM relations loaded explicitly only when needed
+- No @Exclude() needed — mapper functions handle response shaping
+
+## Layering Rules
+- Controller → validates HTTP, calls service, maps to DTO
+- Service → business logic, orchestrates repositories
+- Repository → data access only, no business logic
+- Repository never resolves status names to IDs — service does that
+- Repository never knows WHY it's doing something — only HOW
+
+## Repository Pattern
+- Custom repository class per entity wrapping TypeORM Repository<T>
+- Repository owned by its feature module via forFeature([Entity])
+- Never share repository across modules — share service instead
+- DatabaseModule handles TypeORM connection only, no repository providers
+- Feature modules export their Service, never their Repository
+- Select only needed columns in list queries
+- Always filter deletedOn: IsNull() + isActive: true on active record queries
+- Auth queries (findByEmailWithPassword) explicitly select password field
+- All other queries never select password
+
+## Spec List Behavior
+- List page shows current version only (main_generated_spec with currentVersion)
+- Falls back to pendingVersion for status when currentVersion is NULL (first gen)
+- isRegenerating = true only when BOTH currentVersion AND pendingVersion exist
+- Previous versions accessible via Versions tab on detail page
+- Never list all versions on the list page
+- Always scoped to current authenticated user (userId filter)
+
+## pendingVersion Pattern
+- Set on BOTH first-time spec creation AND regeneration
+- Cleared on COMPLETED (worker success) and FAILED (worker failure)
+- currentVersion NULL + pendingVersion set = first generation in progress
+- currentVersion set + pendingVersion set = regeneration in progress
+- currentVersion set + pendingVersion NULL = stable, no active generation
+- Never update currentVersion until worker COMPLETED
+- isRegenerating flag in list response = !!currentVersion && !!pendingVersion
+
+## PDF Export
+- Uses pdfkit
+- Synchronous — user waits, returns buffer directly
+- No S3 storage of exported PDFs
+- On export: update generated_spec.exported_on = new Date()
+- No EXPORTED status — exportedOn timestamp is sufficient
+- Export allowed only when status is COMPLETED or REVIEWED
+- PDF structure: header (name, description, metadata) + sections in sortOrder
+- Section with no content → "Not mentioned in the provided information (MOM)"
+- Use @SkipTransform() decorator on export endpoint to bypass TransformResponseInterceptor
+
+## TransformResponseInterceptor
+- Registered via APP_INTERCEPTOR in AppModule (not app.useGlobalInterceptors)
+- Uses Reflector for @SkipTransform() decorator support
+- Returns EMPTY when response already sent (headersSent = true)
+- @SkipTransform() decorator skips wrapping for raw response endpoints (PDF export)
+
+## Async Generation Flow (SQS)
+API layer responsibilities:
+1. Validate request
+2. Save MainGeneratedSpec to DB
+3. Create GeneratedSpec with status PROCESSING
+4. Set pendingVersion on MainGeneratedSpec
+5. Upload MOM to S3
+6. Push job to SQS
+7. Return immediately — { id: mainSpecId, versionId: generatedSpecId }
+
+Worker layer responsibilities:
+1. Fetch spec + template sections from DB
+2. Fetch MOM from S3
+3. Call OpenAI (one call, JSON response)
+4. Parse response — sections + risks
+5. In @Transactional():
+   a. Save GeneratedSpecSections
+   b. Save SpecRisks with priority
+   c. Update GeneratedSpec status → COMPLETED + AI metadata
+   d. Deactivate previous versions (isActive = false)
+   e. Update MainGeneratedSpec.currentVersion pointer
+   f. Clear MainGeneratedSpec.pendingVersion (set to null)
+6. Delete SQS message — only after transaction commits
+On failure (outside transaction):
+- Update GeneratedSpec status → FAILED
+- Clear pendingVersion on MainGeneratedSpec
+- Do NOT update currentVersion
+- Do NOT delete SQS message — let SQS retry
+
+## Regenerate Flow
+1. Fetch MainGeneratedSpec — verify ownership
+2. Create new GeneratedSpec (PROCESSING) with next version number
+3. Set pendingVersion = new spec — do NOT update currentVersion
+4. Upload new MOM to S3
+5. Push to SQS
+6. Return { id: mainSpecId, versionId: newGeneratedSpecId }
+- Template language used automatically — no language selection by user
+- Template always uses mainTemplate.currentVersion at time of regeneration
+
+## SQS Job Payload
+interface GenerationJobPayload {
+  generatedSpecId: string;
+  mainSpecId: string;
+  userId: string;
+  momS3Key: string;
+  momS3Bucket: string;
+}
+
+## Architecture Rules
+- Never call OpenAI from API layer (HTTP request lifecycle)
+- OpenAI is only called from the SQS worker process
+- Never update currentVersion before COMPLETED status
+- Never update currentVersion on FAILED status
+- API returns immediately after pushing to SQS
+- Spec language is determined by template language — no user language selection
+
+## Soft Delete Rules
+- Never hard delete any record
+- Soft delete only via deletedOn + deletedBy
+- Always filter deletedOn: IsNull() on active record queries
+
+## Database Schema Decisions
+- MainGeneratedSpec.currentVersion — pointer to latest COMPLETED GeneratedSpec
+- MainGeneratedSpec.pendingVersion — pointer to in-progress generation
+- MainTemplate.currentVersion — pointer to latest active Template version
+- section_type table DROPPED — template_section.description serves as AI guidance
+- Language.code used by frontend (EN/TH) — backend resolves to id
+- SpecStatus.code used by app — backend resolves to id
+- RiskType.code used by AI response — backend resolves to id
+- Language locked per GeneratedSpec version
+- Spec content is read-only after generation
+- Regenerate creates new GeneratedSpec version, never mutates existing
+- MOM stored in S3 — store s3Key + s3Bucket, never full URLs
+- mom_input_type tracks TEXT vs FILE for analytics — always upload to S3
+- AI metadata stored per GeneratedSpec version
+- spec_risk.priority: HIGH | MEDIUM / LOW — AI-determined
+- main_generated_spec.description: optional, user-provided, editable after creation
+- exported_on: timestamp on generated_spec — no EXPORTED status needed
+- AuditLog: no FK on entity_id — survives entity deletion
+- pending_version_id on main_generated_spec — regeneration indicator
+
+## Indexes (already in schema.sql, do not re-create)
+- user(email)
+- audit_log(entity, entity_id)
+- audit_log(changed_by)
+- main_template(user_id, deleted_on)
+- main_template(language_id)
+- template(main_template_id, version)
+- template_section(template_id, sort_order)
+- main_generated_spec(user_id, deleted_on)
+- main_generated_spec(pending_version_id) WHERE pending_version_id IS NOT NULL
+- generated_spec(main_spec_id, version)
+- generated_spec(status_id)
+- generated_spec_section(spec_id, sort_order)
+- spec_risk(spec_id)
+- spec_risk(section_id)
+
+## Local Dev Stack
+- spec-app-pg:         PostgreSQL 16 (localhost:5432)
+- spec-app-redis:      Redis 7 (localhost:6379) — reserved, not wired yet
+- spec-app-sonarqube:  SonarQube community (localhost:9000)
+- SQS: real AWS dev queue (no localstack)
+- Docker network: spec-app-network
+
+## ECS Deployment
+Single Docker image, two ECS task definitions:
+- spec-app-api-task    → CMD: node dist/main.js (port 8000)
+- spec-app-worker-task → CMD: node dist/worker.main.js (no port)
+
+GitHub Actions (OIDC — no long-lived keys):
+- Triggers on push to main
+- Builds image from monorepo root Dockerfile
+- Pushes to ECR with git SHA tag + latest tag
+- Deploys both API and Worker ECS services
+
+Dockerfile at monorepo root:
+- Builds packages/schemas first
+- Then builds backend
+- Production stage copies only dist + node_modules
+
+## AWS Infrastructure (see .cursorrules.local for resource IDs)
+- Region: ap-southeast-1
+- VPC with 2 public + 2 private subnets
+- No NAT Gateway (cost saving)
+- No ALB (cost saving, pre-prod)
+- ECS Fargate in public subnets with public IP enabled
+- RDS PostgreSQL in private subnets (no public access)
+- S3 private bucket for MOM storage
+- SQS standard queue for generation jobs
+- Secrets Manager for all app secrets
+- ECR for Docker images
+- CloudWatch Logs for ECS task logs (/ecs/spec-app-api, /ecs/spec-app-worker)
+
+## IAM Roles
+- Execution role: pulls ECR images + reads Secrets Manager + writes CloudWatch logs
+- Task role: SQS (send/receive/delete) + S3 (put/get/delete) — no other permissions
+- GitHub Actions role: ECR push + ECS deploy via OIDC (no long-lived keys)
+
+## What NOT To Do
+- Do NOT use synchronize: true
+- Do NOT use eager loading on any relation
+- Do NOT return raw entities from controllers
+- Do NOT call AWS SDK for secrets at bootstrap
+- Do NOT add @Exclude() decorators
+- Do NOT hard delete any record
+- Do NOT update currentVersion on FAILED status
+- Do NOT call OpenAI from HTTP request lifecycle
+- Do NOT use BullMQ (using SQS directly)
+- Do NOT use localstack (use real AWS dev SQS queue)
+- Do NOT add NAT Gateway or ALB to infra
+- Do NOT use Aurora Serverless (not in current scope)
+- Do NOT store full S3 URLs (store key + bucket only)
+- Do NOT add chat AI interface (system is workflow-based only)
+- Do NOT repeat audit columns on individual entities (use BaseEntity)
+- Do NOT repeat isActive on individual entities (use BaseEntity)
+- Do NOT add id column on individual entities (use BaseEntity)
+- Do NOT create section-type entity or reference section_type table
+- Do NOT add username field to user entity (email only)
+- Do NOT use class-based DTOs with static from() — use Zod inferred types
+- Do NOT share repositories across modules
+- Do NOT export repositories from feature modules
+- Do NOT put business logic in repositories
+- Do NOT resolve status/type codes to IDs inside repositories
+- Do NOT add EXPORTED as a spec status — use exported_on timestamp instead
+- Do NOT pass EntityManager to repository methods — use @Transactional() decorator
+- Do NOT delete SQS message on failure — let SQS retry
+- Do NOT update currentVersion inside transaction before all saves complete
+- Do NOT require AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY — make optional
+- Do NOT use getOrThrow for optional AWS credential config values
+- Do NOT add PENDING status — specs start with PROCESSING
+- Do NOT allow language selection on spec create or regenerate — use template language
+- Do NOT update currentVersion before worker completes successfully
+- Do NOT clear pendingVersion before worker completes or fails
+- Do NOT register TransformResponseInterceptor via app.useGlobalInterceptors
+  — use APP_INTERCEPTOR provider in AppModule for Reflector injection support
+- Do NOT commit AWS account IDs, ARNs, or resource names — use .cursorrules.local

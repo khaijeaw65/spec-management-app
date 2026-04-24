@@ -1,0 +1,75 @@
+# ============================================================
+# .cursorrules — Spec App Monorepo (Root)
+# ============================================================
+# This file is read by Cursor before every prompt.
+# Each app has its own .cursorrules for app-specific rules.
+# ============================================================
+
+## Project Overview
+SpecBuilder — Specification Clarification Application.
+Workflow-based AI system that converts Minutes of Meeting (MOM)
+into structured specification documents with ambiguity/risk detection.
+Not a chat AI. AI is only called in controlled workflow steps.
+Target users: Business Analysts (BA) and Project Managers (PM).
+2 developers. Pre-production / university project + talent competition.
+
+## Monorepo Structure
+```
+spec-app/
+  backend/          → NestJS API + SQS worker
+  frontend/         → Next.js web app (Vercel)
+  mobile/           → React Native review-only app
+  packages/
+    schemas/        → shared Zod schemas (@spec-app/schemas)
+```
+
+## App Responsibilities
+
+### backend/
+- REST API (HTTP)
+- SQS worker (async AI generation)
+- Two entry points: main.ts (API) and worker.main.ts (worker)
+- Owns database, business logic, AI calls, file storage
+
+### frontend/
+- Web UI for BA/PM users
+- Full workflow: create template, import MOM, generate spec, review
+- Currently demo mode (mock data, no real API calls)
+
+### mobile/
+- Review-only interface
+- Login, view specs, view risks, update status to Reviewed
+- Cannot create templates, generate specs, or regenerate
+
+### packages/schemas/
+- Shared Zod schemas used by frontend, mobile, and backend validation
+- Single source of truth for all DTOs and validation rules
+- Never duplicate schemas in individual apps
+- Import as @spec-app/schemas
+
+## Tech Stack Summary
+- Backend:    NestJS, TypeScript, TypeORM, PostgreSQL 16
+- Frontend:   Next.js 16.2 (App Router), Tailwind CSS v4, HeroUI
+- Mobile:     React Native
+- Shared:     Zod schemas (@spec-app/schemas)
+- Queue:      AWS SQS
+- AI:         OpenAI API (gpt-4o-mini)
+- Storage:    AWS S3
+- Secrets:    AWS Secrets Manager
+- CI/CD:      GitHub Actions → ECR → ECS Fargate
+- Frontend:   Vercel
+
+## Cross-App Rules
+- Zod schemas live in packages/schemas only — never duplicated in apps
+- Types are inferred from Zod schemas — no manual type duplication
+- Backend owns all business logic — frontend/mobile never implement business rules
+- Language values: 'EN' | 'TH' (code) — consistent across all apps
+- Spec is read-only after generation — no editing in any app
+- Regenerate always creates a new version — never mutates existing
+
+## Separation of Concerns
+- Do NOT suggest backend changes when working in frontend/
+- Do NOT suggest frontend changes when working in backend/
+- Do NOT duplicate Zod schemas outside packages/schemas/
+- Do NOT implement business logic in frontend or mobile
+- Do NOT make real API calls from frontend until after demo
