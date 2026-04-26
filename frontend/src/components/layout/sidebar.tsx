@@ -7,6 +7,7 @@ import {
   LogOut,
   Moon,
   Sun,
+  X,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -15,7 +16,6 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/components/providers/theme-provider";
 import { signOut, useSession } from "next-auth/react";
-import { Avatar } from '@heroui/react';
 
 const nav = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -23,7 +23,17 @@ const nav = [
   { href: "/templates", label: "Templates", icon: Layout },
 ] as const;
 
-export function Sidebar() {
+type SidebarProps = {
+  mobileNavOpen: boolean;
+  onMobileNavClose: () => void;
+  sidebarId: string;
+};
+
+export function Sidebar({
+  mobileNavOpen,
+  onMobileNavClose,
+  sidebarId,
+}: Readonly<SidebarProps>) {
   const pathname = usePathname();
   const { theme, toggleTheme } = useTheme();
 
@@ -32,29 +42,48 @@ export function Sidebar() {
   const user = session?.user;
 
   const handleLogout = async () => {
+    onMobileNavClose();
     await signOut({
-      callbackUrl: '/login',
+      callbackUrl: "/login",
     });
-  }
+  };
 
   return (
-    <aside className="fixed left-0 top-0 z-40 flex h-screen w-[240px] flex-col border-r border-zinc-800 bg-zinc-900 text-sm dark:bg-zinc-950">
-      <div className="flex items-center gap-2 border-b border-zinc-800 px-4 py-4">
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-blue-600 p-1.5">
-          <Image
-            alt=""
-            className="size-6 object-contain"
-            height={24}
-            src="/app-icon.svg"
-            width={24}
-          />
+    <aside
+      id={sidebarId}
+      className={cn(
+        "fixed left-0 top-0 z-40 flex h-screen w-[240px] flex-col border-r border-zinc-800 bg-zinc-900 text-sm transition-transform duration-200 ease-out dark:bg-zinc-950",
+        mobileNavOpen ? "translate-x-0" : "-translate-x-full",
+        "lg:translate-x-0",
+      )}
+    >
+      <div className="flex items-center justify-between gap-2 border-b border-zinc-800 px-4 py-4">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-blue-600 p-1.5">
+            <Image
+              alt=""
+              className="size-6 object-contain"
+              height={24}
+              src="/app-icon.svg"
+              width={24}
+            />
+          </div>
+          <span className="truncate font-semibold text-white">SpecBuilder</span>
         </div>
-        <span className="font-semibold text-white">SpecBuilder</span>
+        <button
+          type="button"
+          className="flex size-9 shrink-0 items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white lg:hidden"
+          aria-label="Close navigation"
+          onClick={onMobileNavClose}
+        >
+          <X className="size-5" aria-hidden />
+        </button>
       </div>
-      <nav className="flex flex-1 flex-col gap-0.5 p-2">
+      <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-2">
         {nav.map(({ href, label, icon: Icon }) => {
           const active =
-            pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
+            pathname === href ||
+            (href !== "/dashboard" && pathname.startsWith(href));
           return (
             <Link
               key={href}
@@ -65,6 +94,7 @@ export function Sidebar() {
                   : "text-zinc-400 hover:bg-zinc-700 hover:text-white",
               )}
               href={href}
+              onClick={onMobileNavClose}
             >
               <Icon className="size-4 shrink-0" aria-hidden />
               {label}
@@ -91,10 +121,12 @@ export function Sidebar() {
         </button>
         <div className="flex items-center gap-2 px-2 py-1 text-zinc-300">
           <div className="flex size-8 items-center justify-center rounded-full bg-zinc-700 text-xs font-medium text-white">
-            {user?.name?.split(' ').map((name) => name[0])}
+            {user?.name?.split(" ").map((name) => name[0])}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-xs font-medium text-white">{user?.name}</p>
+            <p className="truncate text-xs font-medium text-white">
+              {user?.name}
+            </p>
             <p className="truncate text-[11px] text-zinc-500">{user?.email}</p>
           </div>
         </div>

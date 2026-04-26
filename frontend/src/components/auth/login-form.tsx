@@ -9,14 +9,17 @@ import {
   Input,
   Label,
   TextField,
+  toast,
 } from "@heroui/react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Controller, useForm } from "react-hook-form";
 
 import { signIn } from "next-auth/react";
 
 export function LoginForm() {
+  const router = useRouter();
   const {
     control,
     handleSubmit,
@@ -27,17 +30,20 @@ export function LoginForm() {
   });
 
   const onSubmit = handleSubmit(async (data) => {
-    try {
-      await signIn("credentials", {
+    const signInResult = await signIn("credentials", {
       email: data.email,
       password: data.password,
-      redirect: true,
-      callbackUrl: "/dashboard",
+      redirect: false,
     });
-    } catch (error) {
-      alert(error);
+
+    if (signInResult?.error) {
+      toast.danger("Invalid email or password.");
+      return;
     }
-    
+
+    if (signInResult?.ok) {
+      router.push("/dashboard");
+    }
   });
   return (
     <Card.Root className="w-full max-w-md border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">

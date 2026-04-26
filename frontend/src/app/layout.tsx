@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
 
+import { AppToastRegion } from "@/components/providers/app-toast-region";
 import { NextAuthSessionProvider } from "@/components/providers/next-auth-session-provider";
 import { QueryClientProviderWrapper } from "@/components/providers/query-client-provider";
 import { ThemeProvider } from "@/components/providers/theme-provider";
@@ -45,7 +46,10 @@ export default function RootLayout({
         </Script>
         <ThemeProvider>
           <NextAuthSessionProvider>
-            <QueryClientProviderWrapper>{children}</QueryClientProviderWrapper>
+            <QueryClientProviderWrapper>
+              <AppToastRegion />
+              {children}
+            </QueryClientProviderWrapper>
           </NextAuthSessionProvider>
         </ThemeProvider>
       </body>
